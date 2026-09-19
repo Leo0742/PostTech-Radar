@@ -12,11 +12,22 @@ frontend/dist/
 
 # Private / local project data and generated artifacts
 data/
-models/
 artifacts/
-outputs/
 references/
 work/
+
+# Keep model binaries private, but keep the public note.
+models/*
+!models/v5/
+models/v5/*
+!models/v5/README.md
+
+# Generated outputs stay private except the small public validation summary.
+outputs/*
+!outputs/qwen4b_lite/
+outputs/qwen4b_lite/*
+!outputs/qwen4b_lite/specialist_validation.json
+
 *.xlsx
 *.xls
 *.csv
