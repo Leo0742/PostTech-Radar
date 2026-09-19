@@ -2,95 +2,114 @@
 
 ## Что именно я обучал
 
-В проекте я не обучал Qwen3-Embedding-8B с нуля. Я использовал его как **frozen encoder** для получения embeddings и **обучал собственный классификационный pipeline** поверх этих признаков.
+В финальных 4B/8B вариантах я **не fine-tune'ил все веса Qwen**. Qwen3-Embedding использовался как frozen encoder, а я обучал собственную классификационную часть поверх embeddings и регистрационных признаков.
 
-Финальный deployment recipe:
+В проекте есть два deployment-профиля:
 
-- encoder: **Qwen3-Embedding-8B** (frozen);
-- trained head: **calibrated LinearSVC**;
-- blend: **0.90 classifier + 0.05 prototype + 0.05 kNN**;
-- дополнительный **TF-IDF specialist** для сложных пар категорий;
-- structured metadata: service, component, request type, priority и другие регистрационные признаки;
-- обучение на **1 931 реальном размеченном обращении**;
-- synthetic training rows в финальной модели: **0**.
-
-То есть моя работа здесь — это подготовка данных, построение признаков, обучение классификаторов, подбор архитектуры пайплайна, сравнение кандидатов, валидация и интеграция модели в приложение.
-
-## Два deployment-профиля
-
-В проекте были подготовлены два обученных варианта классификационного pipeline:
-
-| Профиль | Encoder | Artifact |
+| Профиль | Encoder | Локальный artifact |
 |---|---|---|
 | **Lite / 4B** | Qwen3-Embedding-4B | `models/v5/category_qwen4b_lite.joblib` |
 | **Quality / 8B** | Qwen3-Embedding-8B | `models/v5/category.joblib` |
 
-Оба варианта используют frozen Qwen encoder. Обучалась классификационная часть поверх embeddings, а также подбирались blend/specialist компоненты. 4B-вариант оставлен как более лёгкий профиль, 8B-вариант — как основной quality profile.
+В обоих pipeline использовались supervised classifier, prototype/kNN blend и отдельный TF-IDF specialist для сложных confusion pairs.
 
-## Результаты
+Моя часть работы: data audit, split protocol, baselines, embeddings, обучение классификаторов, tuning, leakage checks, сравнение кандидатов, PEFT experiments и интеграция модели в приложение.
 
-Для portfolio README я показываю leakage-safe cross-validation:
+## Данные
 
-| View | Top-1 | Top-3 | Macro-F1 |
-|---|---:|---:|---:|
-| TOP-15 | **80.8%** | **97.7%** | **76.0%** |
-| FULL-43 | **73.3%** | **89.9%** | **55.3%** |
+- **1 931** real labeled Service Desk tickets;
+- **43** категории;
+- synthetic rows в финальных deployment models: **0**.
 
-В отдельном frozen lockbox evaluation для V5 champion был получен TOP-15 результат около **81.2% Top-1 / 98.0% Top-3 / 76.4% Macro-F1**. Lockbox не использовался для последующего подбора V5.2.
+Raw dataset в public repo не публикуется.
+
+## Development results
+
+| Pipeline | View | Top-1 | Top-3 | Macro-F1 |
+|---|---|---:|---:|---:|
+| **4B Lite** | TOP-15 | **80.781%** | **97.653%** | **76.008%** |
+| **4B Lite** | FULL-43 | **73.276%** | **89.875%** | **55.292%** |
+| **8B Quality V5.2** | TOP-15 | 79.883% | 97.136% | 74.007% |
+| **8B Quality V5.2** | FULL-43 | 68.171% | 88.799% | 53.771% |
+
+4B Lite и 8B Quality тюнились отдельно, поэтому эта таблица не является чистым benchmark размера encoder. Для matched сравнения см. [docs/training/MATCHED_QWEN4B_VS_QWEN8B.md](docs/training/MATCHED_QWEN4B_VS_QWEN8B.md).
+
+У более раннего frozen 8B champion на отдельном V5 INTERNAL LOCKBOX TOP-15 было около **81.19% Top-1 / 98.02% Top-3 / 76.40% Macro-F1**. Этот lockbox не использовался для последующего tuning V5.2.
+
+## 4B Lite
+
+- model: `Qwen/Qwen3-Embedding-4B`;
+- revision: `5cf2132abc99cad020ac570b19d031efec650f2b`;
+- max length: 512;
+- embedding dim: 2560;
+- metadata scale: 0.75;
+- kNN neighbors: 11;
+- prototype temperature: 0.08;
+- specialist: leakage-safe TF-IDF;
+- real training rows: 1 931;
+- artifact SHA-256: `ebd02b8d711b91a7b2ce63c30642d63a5e0a5a8320c2064f4be130c901550d26`.
+
+Training/deployment builder: [scripts/v5_2_build_qwen4b_lite_deployment.py](scripts/v5_2_build_qwen4b_lite_deployment.py).
+
+## 8B Quality
+
+- model: `Qwen/Qwen3-Embedding-8B`;
+- revision: `1d8ad4ca9b3dd8059ad90a75d4983776a23d44af`;
+- max length: 512;
+- embedding dim: 3072;
+- supervised head: calibrated LinearSVC;
+- blend: 0.90 supervised + 0.05 prototype + 0.05 kNN;
+- specialist: leakage-safe TF-IDF;
+- real training rows: 1 931;
+- artifact SHA-256: `5c02b1337590c4e59bc2c0bfd5f279a3baee6a0bfe6945de568265afdf010e98`.
+
+Training/deployment builder: [scripts/v5_2_build_deployment.py](scripts/v5_2_build_deployment.py).
 
 ## Что сравнивал
-
-В ходе экспериментов я проверял:
 
 - TF-IDF + Logistic Regression;
 - LinearSVC;
 - CatBoost;
 - Qwen3-Embedding-4B;
 - Qwen3-Embedding-8B;
-- prototype и kNN branches;
-- specialist-модель на TF-IDF;
-- PEFT/LoRA sanity experiments.
+- prototype/kNN branches;
+- TF-IDF specialist;
+- synthetic-data screens;
+- PEFT/LoRA experiments.
 
-Финальный вариант выбирался по grouped cross-validation, а не по одному случайному split.
+PEFT реально запускался, но стабильного выигрыша не дал и в deployment не вошёл. См. [docs/training/PEFT_SANITY.md](docs/training/PEFT_SANITY.md).
 
-## Валидация
+## Валидация и leakage
 
-Я отдельно следил за утечками данных:
+Я специально не использовал обычный random split как основной результат, потому что в датасете есть дубли и почти одинаковые обращения.
 
-- duplicate/near-duplicate groups не пересекают train и validation;
-- используется group-aware split;
-- похожие обращения не должны одновременно попадать по разные стороны split;
-- target-like поля исключались из specialist features;
-- holdout/lockbox не использовался для подбора финальной конфигурации.
+Frozen protocol:
 
-## Trained artifacts
+- 1 830 unique duplicate groups;
+- 3 repeats × 4 folds;
+- group-disjoint train/validation;
+- development: 1 241 rows;
+- calibration: 306 rows;
+- V5 INTERNAL LOCKBOX: 384 rows;
+- group overlap audit: PASS;
+- synthetic validation rows: 0.
 
-Локально в проекте были сохранены обученные deployment artifacts, включая:
+Отдельно проверялись post-resolution поля и target-like признаки. Перед финальным измерением `routing_target` был удалён из specialist features.
 
-- `models/v5/category.joblib` — основной V5 deployment bundle;
-- `models/v5/category_qwen4b_lite.joblib` — lite profile;
-- классические `category.joblib`, `routing.joblib`, `retrieval.joblib`;
-- evaluation metadata и model hashes.
+Подробнее: [docs/training/V5_EVALUATION_PROTOCOL.md](docs/training/V5_EVALUATION_PROTOCOL.md).
 
-Например, для одного из deployment classifiers в metadata сохранены:
+## Почему `.joblib` bundles не лежат в public GitHub
 
-- `trained_at: 2026-09-16T18:48:57Z`;
-- `training_record_count: 1511` для соответствующего classical split;
-- `model_artifact_sha256: c05e80b05186567c2e3ae408050b5ad5e85856345132024b861a300ee0130d56`.
+Обученные artifacts реально были сохранены локально, и их hashes приведены выше. Но bundles строились на предоставленных Service Desk данных. Сериализованный TF-IDF vocabulary и другие структуры могут содержать производные от непубличных текстов.
 
-Для финального V5.2 pipeline training использовались все **1 931** eligible real labeled tickets.
+Поэтому в public repo я оставляю то, что позволяет проверить мою работу без публикации чужих данных:
 
-## Почему бинарные веса не лежат в public GitHub
-
-Я специально не публикую `.joblib`/model bundles, потому что они обучены на предоставленных Service Desk данных. Сериализованные TF-IDF словари и другие структуры модели могут содержать производные от непубличного текста.
-
-Поэтому публично оставлены:
-
-- training/runtime code;
-- model architecture and recipe;
+- training/deployment code;
+- configs;
+- split/leakage code;
 - tests;
-- dependency files;
-- aggregate metrics;
-- artifact metadata и hashes.
+- aggregate reports;
+- model hashes;
+- inference/runtime code.
 
-Так видно, что модель реально обучалась и использовалась, но при этом я не публикую чужие Service Desk данные или их производные.
+Основное описание обучения: [TRAINING.md](TRAINING.md).
