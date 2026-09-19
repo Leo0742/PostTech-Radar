@@ -15,7 +15,8 @@
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white" alt="scikit-learn" />
   <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" alt="PyTorch" />
-  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />\n  <a href="https://github.com/Leo0742/PostTech-Radar/actions/workflows/ci.yml"><img src="https://github.com/Leo0742/PostTech-Radar/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <a href="https://github.com/Leo0742/PostTech-Radar/actions/workflows/ci.yml"><img src="https://github.com/Leo0742/PostTech-Radar/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
 ## О проекте
