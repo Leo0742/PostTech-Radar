@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white" alt="scikit-learn" />
   <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" alt="PyTorch" />
-  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />\n  <a href="https://github.com/Leo0742/PostTech-Radar/actions/workflows/ci.yml"><img src="https://github.com/Leo0742/PostTech-Radar/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
 ## О проекте
@@ -168,23 +168,68 @@ backend/tests/                           # split/runtime/data tests
 
 Подробнее: [PUBLIC_REPOSITORY_NOTICE.md](PUBLIC_REPOSITORY_NOTICE.md).
 
-## Локальный запуск
+## Проверка public repo
 
-Базовое окружение:
+Public-версию можно проверить без исходного датасета и без GPU:
 
 ```bash
+git clone https://github.com/Leo0742/PostTech-Radar.git
+cd PostTech-Radar
+
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+python -m compileall -q scripts backend/app backend/tests
+python -m pytest backend/tests -q
 ```
 
-GPU-зависимости:
+Это те же основные проверки, которые запускаются в GitHub Actions. Тесты, которым нужен исходный Service Desk XLSX, в public repo корректно пропускаются.
+
+### Воспроизведение 4B / 8B training
+
+Для повторного обучения нужен **свой локальный экземпляр датасета** с тем же контрактом. Исходный Service Desk XLSX я не публикую.
+
+Ожидаемый путь:
+
+```text
+data/raw/Обращения_1931.xlsx
+```
+
+Сначала нужно пересобрать data contract и frozen grouped protocol:
 
 ```bash
-pip install -r requirements-v5-gpu.txt
+python scripts/v5_data_audit.py
+python scripts/v5_protocol.py
 ```
 
-Для полного воспроизведения обучения нужен свой локальный dataset с тем же контрактом. Исходный Service Desk XLSX в репозиторий не входит.
+GPU training рассчитан на NVIDIA CUDA. В моём окружении использовался PyTorch 2.8 + CUDA 12.8:
+
+```bash
+python -m pip install torch==2.8.0 torchvision==0.23.0 \
+  --index-url https://download.pytorch.org/whl/cu128
+
+python -m pip install -r requirements-v5-gpu.txt
+```
+
+После этого deployment bundles собираются отдельными командами:
+
+```bash
+# Qwen3-Embedding-4B Lite
+python scripts/v5_2_build_qwen4b_lite_deployment.py
+
+# Qwen3-Embedding-8B Quality
+python scripts/v5_2_build_deployment.py
+```
+
+Скрипты скачивают pinned Qwen encoders, считают embeddings и обучают классификационную часть. Результаты сохраняются локально в `models/v5/`.
+
+### Полный web-сервис
+
+Полная версия, с которой я работал, использовала локальную SQLite-базу, обученные model bundles и исходные Service Desk данные. Эти файлы не входят в public repo, поэтому я **не пишу здесь фальшивую команду “запустить всё в один клик”**.
+
+Public repository в первую очередь нужен, чтобы можно было проверить ML/training code, validation protocol, runtime, тесты и результаты без публикации непубличных обращений.
 
 ## Что я изучил на этом проекте
 
