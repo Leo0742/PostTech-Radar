@@ -63,6 +63,7 @@ class SentenceTransformerBackend:
             self._model = SentenceTransformer(
                 model_id,
                 revision=revision,
+                trust_remote_code=True,
                 device="cuda",
                 model_kwargs={"torch_dtype": torch.float16},
             )
