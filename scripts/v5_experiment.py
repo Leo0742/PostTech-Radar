@@ -138,8 +138,7 @@ def build_metadata_prefix(row: Mapping[str, Any]) -> str:
         value = _clean_text(row.get(field))
         if value:
             parts.append(f"{field}: {value}")
-    return "
-".join(parts)
+    return "\n".join(parts)
 
 
 def build_text(row: Mapping[str, Any], *, feature_mode: str) -> str:
@@ -153,9 +152,7 @@ def build_text(row: Mapping[str, Any], *, feature_mode: str) -> str:
         return prefix
     prefix = build_metadata_prefix(row)
     if prefix and description:
-        return f"{prefix}
-
-description: {description}"
+        return f"{prefix}\n\ndescription: {description}"
     return prefix or description
 
 
