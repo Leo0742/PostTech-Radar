@@ -1,0 +1,120 @@
+{
+  "winner": {
+    "instruction": "posttech_tight_c",
+    "c": 1,
+    "blend": "svc90_proto05_knn05",
+    "blend_weights": [
+      0.9,
+      0.05,
+      0.05
+    ],
+    "metadata_scale": 0.75,
+    "knn_neighbors": 11,
+    "prototype_temperature": 0.08
+  },
+  "full43": {
+    "enabled": true,
+    "validation": "leave-one-repeat-out specialist selection; each held-out repeat is never used to select its pairs or threshold",
+    "base_metrics": {
+      "top1_accuracy": 0.69219575,
+      "top3_accuracy": 0.898745167,
+      "macro_f1": 0.536001417,
+      "true_label_mrr": 0.803282417
+    },
+    "cross_repeat_metrics": {
+      "top1_accuracy": 0.732758833,
+      "top3_accuracy": 0.898745167,
+      "macro_f1": 0.552919917,
+      "true_label_mrr": 0.823564083
+    },
+    "cross_repeat_corrected_errors": 278,
+    "cross_repeat_introduced_errors": 127,
+    "deployment_pairs": [
+      [
+        "Абонентский ящик",
+        "Отслеживание отправлений"
+      ],
+      [
+        "Автодобавление почтовых отправлений",
+        "Проблема с push/sms/email"
+      ],
+      [
+        "Автодобавление почтовых отправлений",
+        "Проблема с данными в личном кабинете клиента"
+      ],
+      [
+        "Импорт списков из ЛК ЮЛ",
+        "Импорт списков из архива ф.103 (zip-архив)"
+      ],
+      [
+        "Личный кабинет",
+        "Отслеживание отправлений"
+      ],
+      [
+        "Личный кабинет",
+        "Проблема с адресом\\индексом"
+      ],
+      [
+        "Отслеживание отправлений",
+        "Проблема с адресом\\индексом"
+      ],
+      [
+        "Отслеживание отправлений",
+        "Уведомления по электронной почте"
+      ],
+      [
+        "Ошибки загрузки страницы/зависания",
+        "Формирование и закрытие емкостей"
+      ],
+      [
+        "Проблема с QR-код(подключение/отключение)",
+        "Проблема с авторизацией/ЭЗП/Бонусами/Доверенностями"
+      ],
+      [
+        "Проблема с push/sms/email",
+        "Проблема с данными в личном кабинете клиента"
+      ],
+      [
+        "Проблема с ОПС/доставкой",
+        "Тарификация посылок"
+      ],
+      [
+        "Проблема с адресами",
+        "Проблема с данными в личном кабинете клиента"
+      ]
+    ],
+    "deployment_threshold": 0
+  },
+  "top15": {
+    "enabled": true,
+    "base_metrics": {
+      "top1_accuracy": 0.795392,
+      "top3_accuracy": 0.976528083,
+      "macro_f1": 0.733570167,
+      "true_label_mrr": 0.8843895
+    },
+    "cross_repeat_metrics": {
+      "top1_accuracy": 0.807810167,
+      "top3_accuracy": 0.976528083,
+      "macro_f1": 0.7600765,
+      "true_label_mrr": 0.890598583
+    },
+    "cross_repeat_corrected_errors": 80,
+    "cross_repeat_introduced_errors": 44,
+    "deployment_pairs": [
+      [
+        "Личный кабинет",
+        "Отслеживание отправлений"
+      ],
+      [
+        "Ошибки загрузки страницы/зависания",
+        "Формирование и закрытие емкостей"
+      ],
+      [
+        "Проблема с push/sms/email",
+        "Проблема с авторизацией/ЭЗП/Бонусами/Доверенностями"
+      ]
+    ],
+    "deployment_threshold": 0
+  }
+}
