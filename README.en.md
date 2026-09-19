@@ -10,6 +10,8 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Qwen3--Embedding-4B-0F172A?style=for-the-badge" alt="Qwen3-Embedding-4B" />
+  <img src="https://img.shields.io/badge/Qwen3--Embedding-8B-0F172A?style=for-the-badge" alt="Qwen3-Embedding-8B" />
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
   <img src="https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white" alt="scikit-learn" />
@@ -40,6 +42,19 @@ This is not an official PostTech product. I publish it as a portfolio project.
 - group-disjoint validation and leakage checks;
 - FastAPI backend and React/TypeScript frontend;
 - operator feedback separated from automatic retraining.
+
+## Two trained model variants
+
+I built and compared **two embedding-based classifier variants**. In both cases Qwen was used as a frozen encoder, while the classification layer and the rest of the pipeline were trained on my labeled dataset.
+
+| Profile | Encoder | What was trained | Purpose |
+|---|---|---|---|
+| **Lite** | Qwen3-Embedding-4B | classifier on top of embeddings + blend/specialist logic | lighter variant |
+| **Quality** | Qwen3-Embedding-8B | classifier on top of embeddings + blend/specialist logic | main quality-focused variant |
+
+Both variants used the same leakage-safe, group-aware validation approach. The final quality pipeline uses **Qwen3-Embedding-8B**.
+
+> I did not fine-tune the 4B/8B Qwen weights themselves. I used them as encoders and **trained my own classifiers on top of the embeddings**. More details are in [MODEL_CARD.md](MODEL_CARD.md).
 
 ## Evaluation
 
