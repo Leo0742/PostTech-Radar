@@ -19,6 +19,10 @@
 
 ## About
 
+> **Key point:** I prepared the data, trained the classifiers, and compared model variants myself. The final pipeline uses **Qwen3-Embedding-8B as a frozen encoder + a trained calibrated LinearSVC + prototype/kNN + a TF-IDF specialist**. It was trained on **1,931 real labeled tickets**. This is not just an LLM API integration.
+
+[Model and training details](MODEL_CARD.md)
+
 I built PostTech Radar as a student ML/NLP project for Service Desk tickets. The source dataset contained **1,931 labeled tickets**.
 
 The goal is to help an operator understand where a new ticket should go. The service shows several likely categories, recommends a support line, and finds similar historical tickets. The operator still makes the final decision, and corrections can be stored as feedback for controlled retraining.
