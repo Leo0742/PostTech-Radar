@@ -1,0 +1,15 @@
+{
+  "schema_version": "5.2",
+  "profile": "quality",
+  "model": {
+    "id": "Qwen/Qwen3-Embedding-8B",
+    "revision": "1d8ad4ca9b3dd8059ad90a75d4983776a23d44af"
+  },
+  "feature_mode": "separate_metadata_text",
+  "instruction": "posttech_tight_c",
+  "embedding_dim": 3072,
+  "max_length": 512,
+  "head": "calibrated_linearsvc_proto5_knn5",
+  "blend": {"supervised": 0.9, "prototype": 0.05, "knn": 0.05},
+  "validation": {"repeats": [0,1,2], "folds": [0,1,2,3], "group_aware": true}
+}
