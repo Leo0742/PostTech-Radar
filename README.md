@@ -60,7 +60,7 @@
 
 ## Результаты экспериментов
 
-Финальный lite-рецепт на leakage-safe cross-validation:
+Итоговые метрики на leakage-safe grouped cross-validation:
 
 | Набор классов | Top-1 | Top-3 | Macro-F1 |
 |---|---:|---:|---:|
