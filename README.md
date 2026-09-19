@@ -10,6 +10,8 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Qwen3--Embedding-4B-0F172A?style=for-the-badge" alt="Qwen3-Embedding-4B" />
+  <img src="https://img.shields.io/badge/Qwen3--Embedding-8B-0F172A?style=for-the-badge" alt="Qwen3-Embedding-8B" />
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
   <img src="https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white" alt="scikit-learn" />
@@ -42,6 +44,19 @@
 - добавил проверки на leakage;
 - собрал backend на FastAPI и интерфейс на React/TypeScript;
 - добавил operator feedback и ручной controlled retraining вместо автоматического переобучения после каждого исправления.
+
+## Два обученных варианта модели
+
+Я сделал и сравнил **два embedding-based варианта классификатора**. В обоих случаях Qwen использовался как frozen encoder, а классификационная часть обучалась на моих размеченных данных.
+
+| Профиль | Encoder | Что обучалось | Назначение |
+|---|---|---|---|
+| **Lite** | Qwen3-Embedding-4B | классификатор поверх embeddings + blend/specialist logic | более лёгкий вариант |
+| **Quality** | Qwen3-Embedding-8B | классификатор поверх embeddings + blend/specialist logic | основной вариант с упором на качество |
+
+Оба варианта строились на одном leakage-safe протоколе с group-aware validation. Финальным quality-вариантом стал pipeline на **Qwen3-Embedding-8B**.
+
+> Важно: я не fine-tune'ил сами 4B/8B Qwen weights. Я использовал их как encoder и **обучал собственные классификаторы поверх embeddings**. Это отдельно описано в [MODEL_CARD.md](MODEL_CARD.md).
 
 ## Результаты экспериментов
 
