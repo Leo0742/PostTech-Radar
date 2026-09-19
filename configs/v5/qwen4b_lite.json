@@ -1,0 +1,17 @@
+{
+  "schema_version": "5.2",
+  "profile": "lite",
+  "model": {
+    "id": "Qwen/Qwen3-Embedding-4B",
+    "revision": "5cf2132abc99cad020ac570b19d031efec650f2b"
+  },
+  "feature_mode": "separate_metadata_text",
+  "instruction": "posttech_tight_c",
+  "embedding_dim": 2560,
+  "max_length": 512,
+  "metadata_scale": 0.75,
+  "blend": {"supervised": 0.9, "prototype": 0.05, "knn": 0.05},
+  "knn_neighbors": 11,
+  "prototype_temperature": 0.08,
+  "validation": {"repeats": [0,1,2], "folds": [0,1,2,3], "group_aware": true}
+}
