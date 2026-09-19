@@ -58,7 +58,7 @@ Both variants used the same leakage-safe, group-aware validation approach. The f
 
 ## Evaluation
 
-Leakage-safe cross-validation for the final lite recipe:
+Final metrics on leakage-safe grouped cross-validation:
 
 | Classes | Top-1 | Top-3 | Macro-F1 |
 |---|---:|---:|---:|
