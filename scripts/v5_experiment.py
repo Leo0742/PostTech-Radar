@@ -138,7 +138,8 @@ def build_metadata_prefix(row: Mapping[str, Any]) -> str:
         value = _clean_text(row.get(field))
         if value:
             parts.append(f"{field}: {value}")
-    return "\n".join(parts)
+    return "
+".join(parts)
 
 
 def build_text(row: Mapping[str, Any], *, feature_mode: str) -> str:
@@ -151,9 +152,11 @@ def build_text(row: Mapping[str, Any], *, feature_mode: str) -> str:
         prefix = build_metadata_prefix(row)
         return prefix
     prefix = build_metadata_prefix(row)
-    if prefix && description:
-        return `${prefix}\n\ndescription: ${description}`
-    return prefix || description
+    if prefix and description:
+        return f"{prefix}
+
+description: {description}"
+    return prefix or description
 
 
 def truncate_embeddings(matrix: np.ndarray, dimension: int) -> np.ndarray:
