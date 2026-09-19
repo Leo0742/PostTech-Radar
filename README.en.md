@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white" alt="scikit-learn" />
   <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" alt="PyTorch" />
-  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />\n  <a href="https://github.com/Leo0742/PostTech-Radar/actions/workflows/ci.yml"><img src="https://github.com/Leo0742/PostTech-Radar/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
 ## About
@@ -121,6 +121,69 @@ backend/tests/    data/split/runtime tests
 ## Stack
 
 `Python` · `NumPy` · `Pandas` · `scikit-learn` · `CatBoost` · `PyTorch` · `Transformers` · `sentence-transformers` · `FastAPI` · `React` · `TypeScript` · `pytest`
+
+## Checking the public repository
+
+The public version can be checked without the private dataset and without a GPU:
+
+```bash
+git clone https://github.com/Leo0742/PostTech-Radar.git
+cd PostTech-Radar
+
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+python -m compileall -q scripts backend/app backend/tests
+python -m pytest backend/tests -q
+```
+
+These are the main checks used by GitHub Actions. Tests that require the original Service Desk XLSX are skipped in the public repository.
+
+## Reproducing the 4B / 8B training
+
+A local dataset with the same contract is required. The original Service Desk XLSX is not published.
+
+Expected path:
+
+```text
+data/raw/Обращения_1931.xlsx
+```
+
+Build the data contract and grouped evaluation protocol first:
+
+```bash
+python scripts/v5_data_audit.py
+python scripts/v5_protocol.py
+```
+
+GPU training requires NVIDIA CUDA. My setup used PyTorch 2.8 with CUDA 12.8:
+
+```bash
+python -m pip install torch==2.8.0 torchvision==0.23.0 \
+  --index-url https://download.pytorch.org/whl/cu128
+
+python -m pip install -r requirements-v5-gpu.txt
+```
+
+Then build the two deployment bundles:
+
+```bash
+# Qwen3-Embedding-4B Lite
+python scripts/v5_2_build_qwen4b_lite_deployment.py
+
+# Qwen3-Embedding-8B Quality
+python scripts/v5_2_build_deployment.py
+```
+
+The scripts download the pinned Qwen encoders, compute embeddings, train the classifier pipeline, and save the local artifacts under `models/v5/`.
+
+## Full web application
+
+The full version I worked with used a local SQLite database, trained model bundles, and the original Service Desk data. Those private artifacts are not included here, so I do not claim that the public snapshot is a one-command full web demo.
+
+The public repository is meant to make the ML/training code, validation protocol, runtime code, tests, and aggregate results reviewable without publishing private ticket data.
 
 ## Public repository note
 
