@@ -13,89 +13,111 @@
   <img src="https://img.shields.io/badge/Qwen3--Embedding-4B-0F172A?style=for-the-badge" alt="Qwen3-Embedding-4B" />
   <img src="https://img.shields.io/badge/Qwen3--Embedding-8B-0F172A?style=for-the-badge" alt="Qwen3-Embedding-8B" />
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
-  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
   <img src="https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white" alt="scikit-learn" />
   <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" alt="PyTorch" />
-  <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
-  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
 </p>
 
 ## О проекте
 
-> **Главное:** в этом проекте я сам готовил данные, обучал классификаторы и сравнивал модели. Финальный пайплайн использует **Qwen3-Embedding-8B как frozen encoder + обученный calibrated LinearSVC + prototype/kNN + TF-IDF specialist**. Он обучен на **1 931 реальном размеченном обращении**. Это не просто подключение готовой LLM по API.
+Я делал PostTech Radar как учебный ML/NLP-проект для обработки обращений Service Desk. В исходной выборке было **1 931 размеченное обращение и 43 категории**.
 
-[Подробнее о модели и обучении](MODEL_CARD.md)
+Задача модели — по новому обращению показать оператору TOP-3 наиболее вероятных категорий. Кроме этого, сервис рекомендует линию поддержки и ищет похожие обращения в истории.
 
-Я делал PostTech Radar как учебный ML/NLP-проект для обработки обращений Service Desk. В исходной выборке было **1 931 размеченное обращение**.
+> **Что здесь именно моё:** я готовил данные, строил leakage-safe split, сравнивал baseline-модели, получал embeddings, обучал классификаторы поверх них, проверял 4B/8B варианты и собирал итоговые deployment pipelines. Qwen3-Embedding-4B/8B в финальных моделях используются как frozen encoders — я не выдаю это за full fine-tuning Qwen.
 
-Основная задача — по данным нового обращения помочь оператору быстрее понять, куда его направить. Сервис показывает несколько наиболее вероятных категорий, рекомендует линию поддержки и ищет похожие обращения в истории. Финальное решение остаётся за оператором, а его исправления можно сохранить как feedback для следующего контролируемого переобучения.
+Чтобы это не приходилось искать по репозиторию:
+
+- [как обучались модели — TRAINING.md](TRAINING.md);
+- [подробная карточка моделей — MODEL_CARD.md](MODEL_CARD.md);
+- [4B Lite deployment builder](scripts/v5_2_build_qwen4b_lite_deployment.py);
+- [8B Quality deployment builder](scripts/v5_2_build_deployment.py);
+- [grouped evaluation protocol](scripts/v5_protocol.py);
+- [data/leakage audit](scripts/v5_data_audit.py);
+- [LoRA/PEFT sanity experiment](scripts/v5_2_peft_sanity.py);
+- [training reports](docs/training/).
 
 Это не официальный продукт ПочтаТех. Репозиторий опубликован как мой студенческий portfolio project.
 
 ## Что я сделал
 
-- подготовил pipeline импорта и валидации данных;
-- сделал классификацию категории обращения с **TOP-3** вариантами;
-- добавил отдельную модель для рекомендации линии поддержки;
-- реализовал поиск похожих обращений;
-- сравнил **TF-IDF + Logistic Regression**, **LinearSVC**, **CatBoost** и embedding-подходы;
-- использовал **Qwen3 Embeddings** как frozen encoder и обучал свои классификаторы поверх embeddings;
-- сделал group-disjoint validation, чтобы одинаковые или почти одинаковые обращения не попадали одновременно в train и validation;
-- добавил проверки на leakage;
-- собрал backend на FastAPI и интерфейс на React/TypeScript;
-- добавил operator feedback и ручной controlled retraining вместо автоматического переобучения после каждого исправления.
+- подготовил импорт и проверку исходных данных;
+- сделал классификацию обращения с **TOP-3** вариантами;
+- сравнил **TF-IDF + Logistic Regression**, **LinearSVC**, **CatBoost** и embedding-based подходы;
+- собрал два варианта pipeline на **Qwen3-Embedding-4B** и **Qwen3-Embedding-8B**;
+- добавил structured metadata, prototype/kNN blend и TF-IDF specialist для сложных пар классов;
+- сделал group-disjoint validation, чтобы дубли и почти одинаковые обращения не попадали одновременно в train и validation;
+- отдельно проверял leakage и убрал target-like поле из specialist до финального измерения;
+- пробовал PEFT/LoRA для 8B, но не оставил его в финальной модели, потому что стабильного улучшения не получил;
+- сделал backend на FastAPI и frontend на React/TypeScript;
+- добавил operator feedback и controlled retraining.
 
-## Два обученных варианта модели
+## Два варианта модели
 
-Я сделал и сравнил **два embedding-based варианта классификатора**. В обоих случаях Qwen использовался как frozen encoder, а классификационная часть обучалась на моих размеченных данных.
+В обоих вариантах Qwen используется как **frozen embedding encoder**, а классификационная часть обучается на моих размеченных данных.
 
-| Профиль | Encoder | Что обучалось | Назначение |
-|---|---|---|---|
-| **Lite** | Qwen3-Embedding-4B | классификатор поверх embeddings + blend/specialist logic | более лёгкий вариант |
-| **Quality** | Qwen3-Embedding-8B | классификатор поверх embeddings + blend/specialist logic | основной вариант с упором на качество |
+| Профиль | Encoder | Основная идея |
+|---|---|---|
+| **Lite / 4B** | Qwen3-Embedding-4B | более лёгкий pipeline, 2560-d embeddings |
+| **Quality / 8B** | Qwen3-Embedding-8B | более тяжёлый pipeline, 3072-d embeddings |
 
-Оба варианта строились на одном leakage-safe протоколе с group-aware validation. Финальным quality-вариантом стал pipeline на **Qwen3-Embedding-8B**.
+Финальный blend: supervised classifier + prototype + kNN. Для сложных confusion pairs используется отдельный leakage-safe TF-IDF specialist.
 
-> Важно: я не fine-tune'ил сами 4B/8B Qwen weights. Я использовал их как encoder и **обучал собственные классификаторы поверх embeddings**. Это отдельно описано в [MODEL_CARD.md](MODEL_CARD.md).
+### Development metrics
 
-## Результаты экспериментов
+| Pipeline | View | Top-1 | Top-3 | Macro-F1 |
+|---|---|---:|---:|---:|
+| **4B Lite** | TOP-15 | **80.781%** | **97.653%** | **76.008%** |
+| **4B Lite** | FULL-43 | **73.276%** | **89.875%** | **55.292%** |
+| **8B Quality (V5.2)** | TOP-15 | 79.883% | 97.136% | 74.007% |
+| **8B Quality (V5.2)** | FULL-43 | 68.171% | 88.799% | 53.771% |
 
-Итоговые метрики на leakage-safe grouped cross-validation:
+У 4B и 8B были свои tuning steps, поэтому эту таблицу нельзя трактовать как чистый benchmark размера encoder. Для отдельного matched comparison есть [этот отчёт](docs/training/MATCHED_QWEN4B_VS_QWEN8B.md).
 
-| Набор классов | Top-1 | Top-3 | Macro-F1 |
-|---|---:|---:|---:|
-| TOP-15 | **80.8%** | **97.7%** | **76.0%** |
-| FULL-43 | **73.3%** | **89.9%** | **55.3%** |
+У более раннего frozen 8B champion на отдельном V5 INTERNAL LOCKBOX TOP-15 было **81.19% Top-1 / 98.02% Top-3 / 76.40% Macro-F1**. Этот lockbox не использовался для последующего подбора V5.2.
 
-Для меня в этом проекте важнее было не только получить метрику, но и правильно построить эксперимент: разделить данные без утечки, сравнивать модели на одинаковом протоколе и отдельно хранить production feedback.
+## Как я проверял качество
+
+Основная проблема датасета — повторяющиеся и очень похожие обращения. Поэтому обычный случайный split мог бы завысить результат.
+
+Я сделал отдельный grouped protocol:
+
+- **1 931** real labeled rows;
+- **1 830** unique duplicate groups;
+- **3 repeats × 4 folds = 12** frozen grouped folds;
+- development: **1 241** rows;
+- calibration: **306** rows;
+- V5 INTERNAL LOCKBOX: **384** rows;
+- group overlap audit: **PASS**;
+- synthetic rows в validation: **0**.
+
+Подробности: [V5_EVALUATION_PROTOCOL.md](docs/training/V5_EVALUATION_PROTOCOL.md).
+
+## Что было с PEFT / LoRA
+
+Я отдельно проверял LoRA для Qwen3-Embedding-8B. Sanity run прошёл: около **15.34M trainable parameters (0.2022%)**, loss на 20 шагах снизился примерно **1.603 → 1.312**, embeddings действительно менялись.
+
+После этого более серьёзные PEFT-проверки не показали стабильного выигрыша относительно frozen encoder. Поэтому PEFT я **не стал оставлять в deployment только ради того, чтобы сказать, что модель fine-tuned**.
+
+Код sanity-эксперимента: [scripts/v5_2_peft_sanity.py](scripts/v5_2_peft_sanity.py).
 
 ## Как работает сервис
 
 ```mermaid
 flowchart LR
     A[Новое обращение] --> B[Подготовка признаков]
-    B --> C[Category model]
-    C --> D[TOP-3 категорий]
-    B --> E[Routing model]
-    E --> F[Линия поддержки]
-    B --> G[Retrieval]
-    G --> H[Похожие обращения]
-    D --> I[Проверка оператором]
-    F --> I
-    H --> I
-    I --> J[Feedback]
-    J --> K[Контролируемое переобучение]
+    B --> C[Qwen embeddings]
+    C --> D[Trained classifier]
+    D --> E[TOP-3 категорий]
+    B --> F[Routing model]
+    F --> G[Линия поддержки]
+    B --> H[Retrieval]
+    H --> I[Похожие обращения]
+    E --> J[Проверка оператором]
+    G --> J
+    I --> J
+    J --> K[Feedback]
 ```
-
-## ML-часть
-
-В проекте я пробовал два основных направления.
-
-**Классические модели:** TF-IDF по словам и символам, Logistic Regression, LinearSVC, CatBoost. Они дали хороший baseline и помогли понять, где сложность идёт от самих данных, а где от модели.
-
-**Финальный embedding-пайплайн:** Qwen3-Embedding-8B как frozen encoder, обученный calibrated LinearSVC, blend с prototype/kNN и отдельный leakage-safe TF-IDF specialist для сложных пар классов. Также сравнивал Qwen3-Embedding-4B и другие варианты.
-
-Для оценки использовал group-aware split и отдельные проверки на дубли/утечки. Holdout не использовался для подбора модели.
 
 ## Стек
 
@@ -105,29 +127,50 @@ flowchart LR
 | Backend | FastAPI, Pydantic, Uvicorn, SQLite |
 | Frontend | React, TypeScript, Vite |
 | Testing | pytest, Vitest, Ruff |
-| Tools | Git, GitHub, Linux/macOS, CUDA |
+| GPU experiments | CUDA, Qwen3 Embeddings, PEFT/LoRA |
 
-## Структура
+## Что смотреть в репозитории
 
 ```text
-backend/app/        FastAPI, сервисы и ML runtime
-backend/tests/      тесты API, данных, split и ML-contracts
-frontend/src/       React/TypeScript интерфейс
-scripts/            подготовка данных, эксперименты и retraining
-requirements*.txt   Python dependencies
+scripts/
+├── v5_data_audit.py                     # проверка полей и leakage
+├── v5_dataset.py                        # загрузка real labeled dataset
+├── v5_protocol.py                       # grouped CV + lockbox protocol
+├── v5_experiment.py                     # experiment definitions + metrics
+├── v5_gpu_runner.py                     # embedding helpers/cache
+├── v5_2_build_qwen4b_lite_deployment.py # обучение и сборка 4B Lite
+├── v5_2_build_deployment.py             # обучение и сборка 8B Quality
+├── v5_2_peft_sanity.py                  # реальный LoRA sanity experiment
+└── v5_2_benchmark_category_artifact.py  # latency/VRAM benchmark
+
+configs/v5/                              # публичные 4B/8B configs
+docs/training/                           # итоговые отчёты и сравнения
+backend/app/ml/                          # inference/runtime
+backend/tests/                           # split/runtime/data tests
 ```
 
 ## Данные и приватность
 
-Исходный датасет, локальная SQLite-база и бинарные обученные model bundles **не публикуются**. В открытом репозитории оставлены ключевые части кода приложения, ML pipeline, тесты и dependency-файлы.
+В public repo я **не выкладываю**:
 
-Причина простая: проект делался на предоставленных данных Service Desk. В сериализованных model bundles могут находиться словари и другие производные от обучающих данных, поэтому я не выкладываю сами веса/бандлы публично. Вместо этого в репозитории есть код обучения, runtime и отдельный MODEL_CARD с архитектурой, метриками и информацией о trained artifacts.
+- исходный XLSX с Service Desk обращениями;
+- локальную SQLite-базу;
+- сериализованные `.joblib` bundles;
+- файлы с ticket-level примерами;
+- server-specific operational artifacts.
+
+Причина не в том, что модели отсутствуют. В исходном проекте были сохранены реальные deployment artifacts:
+
+- 4B Lite: `models/v5/category_qwen4b_lite.joblib`, SHA-256 `ebd02b8d711b91a7b2ce63c30642d63a5e0a5a8320c2064f4be130c901550d26`;
+- 8B Quality: `models/v5/category.joblib`, SHA-256 `5c02b1337590c4e59bc2c0bfd5f279a3baee6a0bfe6945de568265afdf010e98`.
+
+Я не публикую binaries, потому что они построены на предоставленных Service Desk данных и могут содержать vocabulary или другие производные от непубличного текста. Вместо binaries здесь лежат **training code, configs, hashes и aggregate evaluation reports**.
 
 Подробнее: [PUBLIC_REPOSITORY_NOTICE.md](PUBLIC_REPOSITORY_NOTICE.md).
 
 ## Локальный запуск
 
-Без исходного датасета и model bundles репозиторий в первую очередь служит как portfolio/source snapshot. Для своего набора данных можно подготовить окружение так:
+Базовое окружение:
 
 ```bash
 python3 -m venv .venv
@@ -135,18 +178,14 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Frontend:
+GPU-зависимости:
 
 ```bash
-cd frontend
-npm install
-npm run dev
+pip install -r requirements-v5-gpu.txt
 ```
 
-Для GPU-экспериментов зависимости вынесены в `requirements-v5-gpu.txt`.
+Для полного воспроизведения обучения нужен свой локальный dataset с тем же контрактом. Исходный Service Desk XLSX в репозиторий не входит.
 
 ## Что я изучил на этом проекте
 
-До этого у меня было больше опыта в обычной Python/backend-разработке. Здесь я глубже прошёл полный ML-процесс: подготовку данных, baseline, выбор метрик, cross-validation, leakage, embeddings, сравнение моделей и работу с ошибками классификации.
-
-Проект продолжаю использовать как практику по классическому ML и NLP.
+До этого у меня было больше опыта в Python/backend. На PostTech Radar я впервые глубже прошёл весь ML-процесс: data audit, baselines, grouped cross-validation, leakage, embeddings, model selection, PEFT experiments, deployment artifacts и анализ ошибок классификации.
