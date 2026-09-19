@@ -4,6 +4,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 from scripts.v5_protocol import (
     audit_protocol,
     build_v5_protocol,
@@ -15,6 +17,11 @@ from scripts.v5_protocol import (
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATASET = PROJECT_ROOT / "data" / "raw" / "Обращения_1931.xlsx"
 
+requires_private_dataset = pytest.mark.skipif(
+    not DATASET.exists(),
+    reason="The original Service Desk XLSX is intentionally not published.",
+)
+
 
 def test_protocol_script_can_be_invoked_directly() -> None:
     result = subprocess.run(
@@ -24,7 +31,6 @@ def test_protocol_script_can_be_invoked_directly() -> None:
         text=True,
         check=False,
     )
-
     assert result.returncode == 0, result.stderr
 
 
@@ -32,6 +38,7 @@ def test_group_hash_collapses_case_and_whitespace_duplicates() -> None:
     assert group_hash("  QR  Код\nне РАБОТАЕТ ") == group_hash("qr код не работает")
 
 
+@requires_private_dataset
 def test_protocol_rows_are_rebuilt_from_original_xlsx() -> None:
     rows = load_protocol_rows(DATASET)
 
@@ -41,6 +48,7 @@ def test_protocol_rows_are_rebuilt_from_original_xlsx() -> None:
     assert all(row["registration_date"] for row in rows)
 
 
+@requires_private_dataset
 def test_v5_protocol_is_deterministic_and_has_repeated_grouped_folds() -> None:
     rows = load_protocol_rows(DATASET)
     first = build_v5_protocol(rows)
@@ -55,6 +63,7 @@ def test_v5_protocol_is_deterministic_and_has_repeated_grouped_folds() -> None:
     assert {fold["fold"] for fold in first["folds"]} == {0, 1, 2, 3}
 
 
+@requires_private_dataset
 def test_v5_protocol_has_zero_group_overlap_everywhere() -> None:
     protocol = build_v5_protocol(load_protocol_rows(DATASET))
     audit = audit_protocol(protocol)
