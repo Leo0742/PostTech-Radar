@@ -16,6 +16,17 @@
 
 То есть моя работа здесь — это подготовка данных, построение признаков, обучение классификаторов, подбор архитектуры пайплайна, сравнение кандидатов, валидация и интеграция модели в приложение.
 
+## Два deployment-профиля
+
+В проекте были подготовлены два обученных варианта классификационного pipeline:
+
+| Профиль | Encoder | Artifact |
+|---|---|---|
+| **Lite / 4B** | Qwen3-Embedding-4B | `models/v5/category_qwen4b_lite.joblib` |
+| **Quality / 8B** | Qwen3-Embedding-8B | `models/v5/category.joblib` |
+
+Оба варианта используют frozen Qwen encoder. Обучалась классификационная часть поверх embeddings, а также подбирались blend/specialist компоненты. 4B-вариант оставлен как более лёгкий профиль, 8B-вариант — как основной quality profile.
+
 ## Результаты
 
 Для portfolio README я показываю leakage-safe cross-validation:
