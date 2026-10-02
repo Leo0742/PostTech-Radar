@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "posttech-radar-v5.1-result.schema.json",
+  "title": "PostTech Radar V5.1 GPU experiment result",
+  "type": "object",
+  "required": [
+    "status",
+    "candidate",
+    "metrics",
+    "provenance",
+    "runtime"
+  ],
+  "properties": {
+    "status": {
+      "const": "complete"
+    },
+    "candidate": {
+      "type": "object",
+      "required": [
+        "stage",
+        "server",
+        "model_id",
+        "model_revision",
+        "view",
+        "feature_mode",
+        "instruction",
+        "embedding_dim",
+        "max_length",
+        "head",
+        "repeat",
+        "fold",
+        "seed",
+        "run_id"
+      ]
+    },
+    "metrics": {
+      "type": "object",
+      "required": [
+        "top1_accuracy",
+        "top2_accuracy",
+        "top3_accuracy",
+        "top5_accuracy",
+        "macro_f1",
+        "weighted_f1",
+        "balanced_accuracy",
+        "true_label_mrr",
+        "rank_distribution"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "protocol_version",
+        "dataset_sha256",
+        "split_sha256",
+        "source_xlsx_sha256",
+        "model",
+        "stage",
+        "run_id"
+      ]
+    },
+    "runtime": {
+      "type": "object",
+      "required": [
+        "seconds",
+        "embedding_cache_hits_total",
+        "embedding_cache_misses_total"
+      ]
+    },
+    "effective_head": {
+      "type": "string"
+    },
+    "partition": {
+      "type": "object",
+      "required": [
+        "train_rows",
+        "validation_rows"
+      ]
+    },
+    "real_only_evaluation": {
+      "const": true
+    },
+    "synthetic_rows_in_validation": {
+      "const": 0
+    },
+    "internal_lockbox_accessed": {
+      "const": false
+    }
+  }
+}

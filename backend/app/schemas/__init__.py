@@ -17,7 +17,7 @@ class TicketAnalyzeRequest(BaseModel):
     timezone: str = Field(default="", max_length=100)
 
     @model_validator(mode="after")
-    def require_analyzable_input(self) -> "TicketAnalyzeRequest":
+    def require_analyzable_input(self) -> TicketAnalyzeRequest:
         if not any(
             str(getattr(self, field)).strip()
             for field in (

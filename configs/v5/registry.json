@@ -1,0 +1,57 @@
+{
+  "schema_version": "5.1",
+  "embedding_dims": [
+    4096,
+    3072,
+    2048,
+    1024
+  ],
+  "sequence_lengths": [
+    128,
+    256,
+    384,
+    512,
+    768,
+    1024
+  ],
+  "instructions": {
+    "none": "",
+    "ru_concise": "Представь запрос Service Desk так, чтобы запросы одной категории были близки, а похожие категории различались.",
+    "en_concise": "Represent this Service Desk request so tickets from the same category are close and confusable categories are separated.",
+    "bilingual": "Представь запрос Service Desk по смыслу категории. Represent the request so same-category tickets are close and confusable categories are separated.",
+    "taxonomy_aware": "Encode the Service Desk intent for category classification across the known request taxonomy; separate semantically similar but distinct request categories.",
+    "posttech_service_desk": "Represent this Russian PostTech Service Desk request for request-category recommendation to a human operator; keep same-category tickets close and separate commonly confused categories."
+  },
+  "feature_modes": [
+    "metadata_only_fallback",
+    "metadata_prefix_text",
+    "metadata_prior_text",
+    "separate_metadata_text",
+    "text_only",
+    "text_only_fallback"
+  ],
+  "heads": [
+    "calibrated_linearsvc",
+    "calibrated_logreg",
+    "centroid",
+    "knn",
+    "label_similarity",
+    "logreg",
+    "metadata_fusion",
+    "shallow_mlp"
+  ],
+  "selection_order": [
+    "top1_accuracy",
+    "macro_f1",
+    "top3_accuracy",
+    "true_label_mrr",
+    "full43_macro_f1",
+    "balanced_accuracy",
+    "missingness_robustness",
+    "calibration",
+    "temporal_robustness",
+    "fold_stability",
+    "latency",
+    "vram"
+  ]
+}

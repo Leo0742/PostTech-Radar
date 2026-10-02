@@ -264,10 +264,22 @@ def _policy_for_field(name: str) -> dict[str, Any]:
             "safe_for_category": False,
             "safe_for_routing": False,
             "is_target": True,
-            "post_resolution_or_leakage": False,
+            "post_resolution_or_leakage": True,
             "predictive_role": "routing_target",
-            "routing_usage": "supervised_target",
-            "evidence": "Routing supervised target.",
+            "routing_usage": "target_only",
+            "evidence": "Final resolver/support line is the routing target and is unavailable when the recommendation is made.",
+        }
+    if name in UNCERTAIN_REGISTRATION_FIELDS:
+        return {
+            "available_at_registration": "uncertain",
+            "optional": True,
+            "safe_for_category": False,
+            "safe_for_routing": False,
+            "is_target": False,
+            "post_resolution_or_leakage": False,
+            "predictive_role": "conditional_optional_only",
+            "routing_usage": "exclude_from_core_until_business_timing_is_proven",
+            "evidence": "The V5.1 brief explicitly requires proof that this SLA field exists before inference. Core models must not depend on it; benchmark separately only after product-contract confirmation.",
         }
     if name in POST_RESOLUTION_FIELDS:
         return {
@@ -281,83 +293,39 @@ def _policy_for_field(name: str) -> dict[str, Any]:
             "routing_usage": "forbidden_feature",
             "evidence": "Produced or finalized after ticket processing; using it at first recommendation time would leak future information.",
         }
-    if name in UNCERTAIN_REGISTRATION_FIELDS:
-        return {
-            "available_at_registration": "uncertain",
-            "optional": True,
-            "safe_for_category": False,
-            "safe_for_routing": False,
-            "is_target": False,
-            "post_resolution_or_leakage": False,
-            "predictive_role": "conditional_registration_feature",
-            "routing_usage": "exclude_until_availability_is_proven",
-            "evidence": "Potential planning/registration field; product-time availability was not proven, so it is excluded from the core model contract.",
-        }
-    return {
-        "available_at_registration": "unknown",
-        "optional": True,
-        "safe_for_category": False,
-        "safe_for_routing": False,
-        "is_target": False,
-        "post_resolution_or_leakage": False,
-        "predictive_role": "excluded_or_unknown",
-        "routing_usage": "excluded_or_unknown",
-        "evidence": "Not part of the core V5 registration-time contract.",
-    }
+    raise ValueError(f"No V5 field policy defined for source column: {name}")
 
 
-def _field_contract(header: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
-    values = [row[header] for row in rows]
-    nonmissing = [value for value in values if value not in {None, ""}]
-    missing = len(values) - len(nonmissing)
-    cardinality = len({_normalize_text(value) for value in nonmissing})
-    policy = _policy_for_field(header)
-    return {
-        "name": header,
-        "semantic_type": _semantic_type(header),
-        "missing_count": missing,
-        "missing_percentage": round(missing * 100.0 / len(values), 6) if values else None,
-        "cardinality_nonmissing": cardinality,
-        **policy,
-    }
+def _counter(values: list[Any]) -> list[dict[str, Any]]:
+    counts = Counter(str(value).strip() for value in values if value not in {None, ""})
+    return [
+        {"name": label, "count": count}
+        for label, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
 
 
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _normalize_text(value: Any) -> str:
-    if value is None:
-        return ""
-    return " ".join(str(value).split())
-
-
-def _percentile(values: list[int], quantile: float) -> int | None:
+def _percentile(values: list[int], q: float) -> int | None:
     if not values:
         return None
-    sorted_values = sorted(values)
-    position = int((len(sorted_values) - 1) * quantile)
-    return sorted_values[position]
+    ordered = sorted(values)
+    index = max(0, min(len(ordered) - 1, math.ceil(q * len(ordered)) - 1))
+    return ordered[index]
 
 
 def _description_stats(values: list[Any]) -> dict[str, Any]:
-    texts = [_normalize_text(value) for value in values]
-    lengths = [len(text) for text in texts]
+    texts = [str(value).strip() for value in values if value not in {None, ""} and str(value).strip()]
+    chars = [len(text) for text in texts]
     tokens = [len(text.split()) for text in texts]
     return {
-        "nonempty": sum(bool(text) for text in texts),
-        "empty": sum(not text for text in texts),
+        "nonempty": len(texts),
+        "empty": len(values) - len(texts),
         "characters": {
-            "min": min(lengths) if lengths else None,
-            "median": statistics.median(lengths) if lengths else None,
-            "p90": _percentile(lengths, 0.90),
-            "p95": _percentile(lengths, 0.95),
-            "p99": _percentile(lengths, 0.99),
-            "max": max(lengths) if lengths else None,
+            "min": min(chars) if chars else None,
+            "median": statistics.median(chars) if chars else None,
+            "p90": _percentile(chars, 0.90),
+            "p95": _percentile(chars, 0.95),
+            "p99": _percentile(chars, 0.99),
+            "max": max(chars) if chars else None,
         },
         "whitespace_tokens": {
             "min": min(tokens) if tokens else None,
@@ -371,23 +339,29 @@ def _description_stats(values: list[Any]) -> dict[str, Any]:
 
 
 def _category_line_distribution(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    by_category: dict[str, Counter[str]] = defaultdict(Counter)
+    counts: dict[str, Counter[str]] = defaultdict(Counter)
     for row in rows:
-        category = _normalize_text(row[CATEGORY_TARGET])
-        line = _normalize_text(row[ROUTING_TARGET])
-        by_category[category][line] += 1
+        category = row.get(CATEGORY_TARGET)
+        line = row.get(ROUTING_TARGET)
+        if category in {None, ""} or line in {None, ""}:
+            continue
+        counts[str(category).strip()][str(line).strip()] += 1
     result = []
-    for category in sorted(by_category):
-        counts = by_category[category]
-        total = sum(counts.values())
+    for category, line_counts in sorted(counts.items()):
+        total = sum(line_counts.values())
         result.append(
             {
                 "category": category,
                 "total": total,
-                "line_counts": dict(counts),
-                "line_probabilities": {
-                    line: round(count / total, 6) for line, count in counts.items()
-                },
+                "lines": [
+                    {
+                        "line": line,
+                        "count": count,
+                        "probability": round(count / total, 8),
+                    }
+                    for line, count in sorted(line_counts.items())
+                ],
+                "dominant_line_probability": round(max(line_counts.values()) / total, 8),
             }
         )
     return result
@@ -395,50 +369,40 @@ def _category_line_distribution(rows: list[dict[str, Any]]) -> list[dict[str, An
 
 def build_data_contract(path: Path) -> dict[str, Any]:
     path = Path(path)
-    sheet_name, headers, rows, source_storage = read_xlsx_rows(path)
-    if len(rows) != 1931:
-        raise ValueError(f"Expected 1931 data rows, found {len(rows)}")
-    duplicate_headers = [name for name, count in Counter(headers).items() if count > 1]
-    if duplicate_headers:
-        raise ValueError(f"Duplicate XLSX headers: {duplicate_headers}")
-    if "Номер запроса" not in headers:
-        raise ValueError("Номер запроса column is missing")
-    request_ids = [_normalize_text(row["Номер запроса"]) for row in rows]
-    if any(not value for value in request_ids):
-        raise ValueError("Request ID contains empty values")
-    if len(set(request_ids)) != len(request_ids):
-        raise ValueError("Request ID must be unique")
+    sheet_name, headers, rows, storage_types = read_xlsx_rows(path)
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    row_count = len(rows)
 
-    category_counts = Counter(_normalize_text(row[CATEGORY_TARGET]) for row in rows)
-    if "" in category_counts:
-        raise ValueError("Category target contains missing values")
-    routing_counts = Counter(_normalize_text(row[ROUTING_TARGET]) for row in rows)
-    if "" in routing_counts:
-        raise ValueError("Routing target contains missing values")
-
-    top_categories = category_counts.most_common(15)
     fields = []
-    for header in headers:
-        field = _field_contract(header, rows)
-        field["source_storage_types"] = source_storage[header]
+    for name in headers:
+        values = [row.get(name) for row in rows]
+        missing = sum(value in {None, ""} for value in values)
+        distinct = len({str(value) for value in values if value not in {None, ""}})
+        field = {
+            "name": name,
+            "semantic_type": _semantic_type(name),
+            "missing_count": missing,
+            "missing_percentage": round((missing / row_count * 100) if row_count else 0.0, 6),
+            "cardinality_nonmissing": distinct,
+            "source_storage_types": storage_types[name],
+            **_policy_for_field(name),
+        }
         fields.append(field)
 
-    category_distribution = [
-        {"name": name, "count": count} for name, count in category_counts.most_common()
-    ]
-    top15 = [{"name": name, "count": count} for name, count in top_categories]
-    routing_distribution = [
-        {"name": name, "count": count} for name, count in routing_counts.most_common()
-    ]
+    category_distribution = _counter([row.get(CATEGORY_TARGET) for row in rows])
+    routing_distribution = _counter([row.get(ROUTING_TARGET) for row in rows])
+    top15 = category_distribution[:15]
 
     contract = {
+        "contract_version": "5.1",
         "dataset": {
-            "path": str(path.resolve()),
-            "sha256": _sha256_file(path),
+            "path": str(path),
+            "sha256": digest,
             "sheet": sheet_name,
-            "records": len(rows),
+            "records": row_count,
             "source_columns": len(headers),
         },
+        "targets": {"category": CATEGORY_TARGET, "routing": ROUTING_TARGET},
         "core_category_features": list(CORE_REGISTRATION_FIELDS),
         "core_routing_features": list(CORE_REGISTRATION_FIELDS),
         "conditional_optional_fields": list(UNCERTAIN_REGISTRATION_FIELDS),
@@ -493,6 +457,118 @@ def _md_escape(value: Any) -> str:
     return str(value).replace("|", "\\|").replace("\n", " ")
 
 
+def _render_markdown(contract: dict[str, Any]) -> str:
+    dataset = contract["dataset"]
+    category = contract["category_summary"]
+    routing = contract["routing_summary"]
+    description = contract["description_length"]
+    lines = [
+        "# PostTech Radar V5.1 — Input/Output Contract",
+        "",
+        "## Dataset facts recalculated from the original XLSX",
+        "",
+        f"- Source sheet: `{dataset['sheet']}`",
+        f"- Real tickets: **{dataset['records']}**",
+        f"- Named source columns: **{dataset['source_columns']}**",
+        f"- Dataset SHA-256: `{dataset['sha256']}`",
+        f"- Historical request categories: **{category['distinct_categories']}**",
+        f"- Official TOP15 coverage: **{category['top15_records']} / {dataset['records']}** ({category['top15_records'] / dataset['records']:.2%})",
+        f"- Routing labels: **{routing['distinct_lines']}**",
+        "",
+        "This contract answers one production question: **what can the model genuinely know when a new ticket is registered?**",
+        "",
+        "## Primary targets",
+        "",
+        f"- Category: `{CATEGORY_TARGET}` — TOP15 primary head plus FULL43 extended head.",
+        f"- Routing: `{ROUTING_TARGET}` — real supervised support-line prediction.",
+        "- Pre-confirmation routing may use only registration-time fields plus OOF category probabilities/TOP-k signals.",
+        "- Post-confirmation routing may use the category after the operator has genuinely confirmed or corrected it.",
+        "",
+        "## Source-field contract",
+        "",
+        "| Source column | Type | Missing | Cardinality | Available at registration | Optional | Category-safe | Routing-safe | Target | Post-resolution/leakage | Predictive role | Evidence |",
+        "|---|---:|---:|---:|---|---:|---:|---:|---:|---:|---|---|",
+    ]
+    for field in contract["fields"]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    _md_escape(field["name"]),
+                    _md_escape(field["semantic_type"]),
+                    f"{field['missing_count']} ({field['missing_percentage']:.2f}%)",
+                    str(field["cardinality_nonmissing"]),
+                    field["available_at_registration"],
+                    "yes" if field["optional"] else "no",
+                    "yes" if field["safe_for_category"] else "no",
+                    "yes" if field["safe_for_routing"] else "no",
+                    "yes" if field["is_target"] else "no",
+                    "yes" if field["post_resolution_or_leakage"] else "no",
+                    field["predictive_role"],
+                    _md_escape(field["evidence"]),
+                ]
+            )
+            + " |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Core registration-time model inputs",
+            "",
+            *[f"- `{name}`" for name in contract["core_category_features"]],
+            "",
+            "The three SLA planning fields are deliberately **not** core inputs until the real product process proves they exist before inference. They remain conditional optional candidates for a separate benchmark.",
+            "",
+            "## Category distribution",
+            "",
+            "| Rank | Category | Real tickets |",
+            "|---:|---|---:|",
+        ]
+    )
+    for rank, item in enumerate(category["all_categories"], 1):
+        lines.append(f"| {rank} | {_md_escape(item['name'])} | {item['count']} |")
+
+    lines.extend(
+        [
+            "",
+            "## Routing distribution",
+            "",
+            "| Support line | Real tickets |",
+            "|---|---:|",
+        ]
+    )
+    for item in routing["distribution"]:
+        lines.append(f"| {_md_escape(item['name'])} | {item['count']} |")
+
+    lines.extend(
+        [
+            "",
+            "## Description-length reality",
+            "",
+            f"- Non-empty descriptions: **{description['nonempty']}**; empty: **{description['empty']}**.",
+            f"- Character length median/p90/p95/p99/max: **{description['characters']['median']} / {description['characters']['p90']} / {description['characters']['p95']} / {description['characters']['p99']} / {description['characters']['max']}**.",
+            f"- Whitespace-token median/p90/p95/p99/max: **{description['whitespace_tokens']['median']} / {description['whitespace_tokens']['p90']} / {description['whitespace_tokens']['p95']} / {description['whitespace_tokens']['p99']} / {description['whitespace_tokens']['max']}**.",
+            "",
+            "These measurements should drive the V5 sequence-length benchmark; 32K context is not assumed useful.",
+            "",
+            "## Leakage rules enforced by V5",
+            "",
+            "- Request ID is identity/tracking only and is never predictive.",
+            "- True category is never a hidden pre-confirmation routing feature; training uses OOF predicted category signals.",
+            "- Confirmed category is legitimate only after the operator confirmation step.",
+            "- Final status, completion timestamps/duration, overdue outcome, line work/reaction time, clarifications and work result are forbidden predictive inputs.",
+            "- Synthetic examples are train-only; validation remains real-only.",
+            "",
+            "## Category → line ambiguity",
+            "",
+            "The machine-readable `data_contract.json` contains the full `P(line | category)` table. V5 routing must model non-deterministic categories rather than hard-code a category-to-line lookup.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def write_outputs(contract: dict[str, Any]) -> None:
     ARTIFACT_ROOT.mkdir(parents=True, exist_ok=True)
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
@@ -508,6 +584,9 @@ def write_outputs(contract: dict[str, Any]) -> None:
     (ARTIFACT_ROOT / "dataset_summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+    (OUTPUT_ROOT / "V5_INPUT_OUTPUT_CONTRACT.md").write_text(
+        _render_markdown(contract), encoding="utf-8"
+    )
 
 
 def main() -> None:
@@ -516,7 +595,20 @@ def main() -> None:
     args = parser.parse_args()
     contract = build_data_contract(args.dataset)
     write_outputs(contract)
-    print(json.dumps({"records": contract["dataset"]["records"], "sha256": contract["dataset"]["sha256"]}, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {
+                "records": contract["dataset"]["records"],
+                "columns": contract["dataset"]["source_columns"],
+                "sha256": contract["dataset"]["sha256"],
+                "categories": contract["category_summary"]["distinct_categories"],
+                "top15_records": contract["category_summary"]["top15_records"],
+                "support_lines": contract["routing_summary"]["distribution"],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

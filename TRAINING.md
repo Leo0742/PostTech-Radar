@@ -1,3 +1,5 @@
+> Historical V5.2 experiments. The final fine-tuned runtime is documented in [README.md](README.md). These metrics do not describe the final MiniLM/LoRA deployment.
+
 # Training notes
 
 This file explains how I trained the category models used in PostTech Radar.

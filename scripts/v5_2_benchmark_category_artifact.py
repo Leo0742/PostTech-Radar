@@ -16,7 +16,7 @@ for path in (ROOT, ROOT / "backend"):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from scripts.v5_dataset import DEFAULT_DATASET, load_v5_rows
+from scripts.v5_dataset import DEFAULT_DATASET, load_v5_rows  # noqa: E402
 
 
 def _row_payload(row: dict[str, object]) -> dict[str, object]:

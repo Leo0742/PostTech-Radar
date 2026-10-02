@@ -25,6 +25,13 @@ INSTRUCTION_REGISTRY: dict[str, str] = {
     "bilingual": "Представь запрос Service Desk по смыслу категории. Represent the request so same-category tickets are close and confusable categories are separated.",
     "taxonomy_aware": "Encode the Service Desk intent for category classification across the known request taxonomy; separate semantically similar but distinct request categories.",
     "posttech_service_desk": "Represent this Russian PostTech Service Desk request for request-category recommendation to a human operator; keep same-category tickets close and separate commonly confused categories.",
+}
+
+# V5.1 is a frozen search protocol and its registry is part of the reproducibility
+# contract. Later V5.2+ sprints may use additional instructions without mutating
+# that frozen registry.
+EXTENDED_INSTRUCTION_REGISTRY: dict[str, str] = {
+    **INSTRUCTION_REGISTRY,
     "posttech_tight_a": "Represent this Russian Service Desk ticket for intent classification. Tickets from the same PostTech category should be close and confusing categories should be separated.",
     "posttech_tight_b": "Encode this support request so that its embedding identifies the correct Service Desk request category, especially distinguishing semantically similar Russian postal IT issues.",
     "posttech_tight_c": "Represent the meaning of this Russian technical support ticket for fine-grained intent classification. Ignore irrelevant wording and emphasize the details that distinguish neighboring request categories.",
@@ -49,6 +56,9 @@ HEAD_REGISTRY = {
     "knn",
     "label_similarity",
     "metadata_fusion",
+}
+
+EXTENDED_HEAD_REGISTRY = HEAD_REGISTRY | {
     "calibrated_linearsvc_c0_5",
     "calibrated_linearsvc_c2",
     "calibrated_linearsvc_c4",
@@ -281,9 +291,9 @@ def build_stage_candidates(
     heads = [str(value) for value in stage.get("heads", ["logreg"])]
     views = [str(value) for value in stage.get("views", ["top15"])]
 
-    unknown_instructions = set(instructions) - set(INSTRUCTION_REGISTRY)
+    unknown_instructions = set(instructions) - set(EXTENDED_INSTRUCTION_REGISTRY)
     unknown_modes = set(feature_modes) - FEATURE_MODES
-    unknown_heads = set(heads) - HEAD_REGISTRY
+    unknown_heads = set(heads) - EXTENDED_HEAD_REGISTRY
     if unknown_instructions:
         raise ValueError(f"Unknown instructions: {sorted(unknown_instructions)}")
     if unknown_modes:

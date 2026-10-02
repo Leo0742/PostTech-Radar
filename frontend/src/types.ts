@@ -1,4 +1,4 @@
-export type NavPage = 'processing' | 'history' | 'analytics' | 'process' | 'system' | 'overview' | 'new' | 'quality' | 'data'
+export type NavPage = 'processing' | 'history' | 'analytics' | 'overview' | 'new' | 'quality' | 'data'
 
 export interface DatasetOptions {
   services: string[]
@@ -69,7 +69,36 @@ export interface AnalysisResult {
   sla_risk: { risk: number; sample_size: number; level: string; explanation: string; basis?: string; support_n?: number; reliability?: string; interval_95?: number[] }
   retrieval?: { rejected: boolean; reason: string; threshold: number; best_relevance: number }
   similar: SimilarTicket[]
-  model_provenance?: { candidate_id?: string; family?: string; trained_at?: string; policy?: string }
+  model_provenance?: {
+    candidate_id?: string
+    family?: string
+    model_family?: string
+    model_id?: string
+    model_revision?: string
+    profile?: string
+    trained_at?: string
+    policy?: string
+    fallback?: boolean
+    fallback_reason?: string
+  }
+}
+
+export interface QwenRecheckResult {
+  category: {
+    label: string
+    confidence: number
+    alternatives: PredictionOption[]
+  }
+  model_provenance?: {
+    candidate_id?: string
+    model_id?: string
+    model_revision?: string
+    profile?: string
+    embedding_dim?: number
+    runtime?: string
+    ephemeral?: boolean
+  }
+  latency_seconds: number
 }
 
 export interface IncomingBatch {
@@ -125,4 +154,46 @@ export interface IncomingTicket {
   needs_training_review?: boolean
   attention: boolean
   raw: Record<string, unknown>
+}
+
+export interface BreakdownRow {
+  name: string
+  count: number
+  overdue: number
+  sample_n: number
+  raw_overdue_rate: number
+  overdue_share: number
+  smoothed_risk: number
+  median_duration_seconds: number
+  p90_duration_seconds: number
+  avg_duration_seconds: number
+  avg_clarifications: number
+}
+
+export interface AnalyticsData {
+  kpis: {
+    tickets: number
+    overdue: number
+    overdue_share: number
+    median_duration_seconds: number
+    median_duration: string
+    p90_duration_seconds: number
+    p90_duration: string
+    multi_line: number
+    high_clarifications: number
+    clarification_threshold: number
+  }
+  breakdowns: {
+    categories: BreakdownRow[]
+    services: BreakdownRow[]
+    priorities: BreakdownRow[]
+    support_lines: BreakdownRow[]
+  }
+  time: { month: string; count: number; overdue: number; overdue_share: number; smoothed_risk: number }[]
+  methodology: Record<string, string>
+}
+
+export interface ProcessData {
+  status_history: { available: boolean; message: string; required_columns: string[]; event_count?: number; request_count?: number; transitions: { from: string; to: string; count: number; share: number }[]; dwell: { status: string; median_seconds: number; sample_n: number }[] }
+  participation: { edge_semantics: string; combinations: { combination: string; count: number; overdue_rate: number; median_duration_seconds: number }[]; resolver_edges: { participant: string; resolver: string; count: number }[]; co_participation: { line_a: string; line_b: string; count: number }[]; duration_groups: { single_line: { sample_n: number; median_seconds: number; p90_seconds: number }; multi_line: { sample_n: number; median_seconds: number; p90_seconds: number } }; multi_line_count: number; ticket_count: number }
 }

@@ -1,0 +1,140 @@
+{
+  "schema_version": "5.1",
+  "server": "B-quality-sprint",
+  "workspace": "/workspace/posttech-v5-qwen8b",
+  "artifact_root": "artifacts/gpu_research_v5/runs/qwen8b_quality_sprint",
+  "model": {
+    "id": "Qwen/Qwen3-Embedding-8B",
+    "revision": "1d8ad4ca9b3dd8059ad90a75d4983776a23d44af",
+    "deployment_policy": "normal"
+  },
+  "stages": [
+    {
+      "name": "quality_dim_repeated",
+      "views": ["top15"],
+      "feature_modes": ["separate_metadata_text"],
+      "instructions": ["en_concise"],
+      "embedding_dims": [4096, 3072, 2048],
+      "max_lengths": [512],
+      "heads": ["calibrated_linearsvc"],
+      "repeats": [0, 1, 2],
+      "folds": [0, 1, 2, 3]
+    },
+    {
+      "name": "quality_instruction_repeated",
+      "inherit_best_from": "quality_dim_repeated",
+      "inherit_fields": [
+        "model_id",
+        "model_revision",
+        "deployment_policy",
+        "embedding_dim",
+        "max_length",
+        "feature_mode",
+        "head"
+      ],
+      "views": ["top15"],
+      "feature_modes": ["separate_metadata_text"],
+      "instructions": [
+        "en_concise",
+        "posttech_tight_a",
+        "posttech_tight_b",
+        "posttech_tight_c",
+        "posttech_ru_noisy"
+      ],
+      "embedding_dims": [3072],
+      "max_lengths": [512],
+      "heads": ["calibrated_linearsvc"],
+      "repeats": [0, 1, 2],
+      "folds": [0, 1, 2, 3]
+    },
+    {
+      "name": "quality_head_repeated",
+      "inherit_best_from": "quality_instruction_repeated",
+      "inherit_fields": [
+        "model_id",
+        "model_revision",
+        "deployment_policy",
+        "embedding_dim",
+        "max_length",
+        "feature_mode",
+        "instruction"
+      ],
+      "views": ["top15"],
+      "feature_modes": ["separate_metadata_text"],
+      "instructions": ["en_concise"],
+      "embedding_dims": [3072],
+      "max_lengths": [512],
+      "heads": [
+        "calibrated_linearsvc",
+        "calibrated_linearsvc_c0_5",
+        "calibrated_linearsvc_c2",
+        "calibrated_linearsvc_c4",
+        "calibrated_linearsvc_unweighted",
+        "calibrated_linearsvc_isotonic",
+        "calibrated_linearsvc_meta20",
+        "calibrated_linearsvc_meta35",
+        "calibrated_linearsvc_catboost20",
+        "calibrated_linearsvc_proto10",
+        "calibrated_linearsvc_knn10",
+        "oof_stack_logreg",
+        "shallow_mlp",
+        "logreg",
+        "calibrated_logreg"
+      ],
+      "repeats": [0, 1, 2],
+      "folds": [0, 1, 2, 3]
+    },
+    {
+      "name": "quality_head_refine",
+      "views": ["top15"],
+      "feature_modes": ["separate_metadata_text"],
+      "instructions": ["posttech_tight_c"],
+      "embedding_dims": [3072],
+      "max_lengths": [512],
+      "heads": [
+        "calibrated_linearsvc",
+        "calibrated_linearsvc_c0_5",
+        "calibrated_linearsvc_c2",
+        "calibrated_linearsvc_unweighted",
+        "calibrated_linearsvc_catboost20",
+        "calibrated_linearsvc_proto10",
+        "calibrated_linearsvc_knn10"
+      ],
+      "repeats": [0, 1, 2],
+      "folds": [0, 1, 2, 3]
+    },
+    {
+      "name": "quality_ensemble_repeated",
+      "views": ["top15"],
+      "feature_modes": ["separate_metadata_text"],
+      "instructions": ["posttech_tight_c"],
+      "embedding_dims": [3072],
+      "max_lengths": [512],
+      "heads": ["calibrated_linearsvc_proto5_knn5"],
+      "repeats": [0, 1, 2],
+      "folds": [0, 1, 2, 3]
+    },
+    {
+      "name": "quality_final_repeated",
+      "inherit_best_from": "quality_ensemble_repeated",
+      "inherit_fields": [
+        "model_id",
+        "model_revision",
+        "deployment_policy",
+        "embedding_dim",
+        "max_length",
+        "feature_mode",
+        "instruction",
+        "head"
+      ],
+      "views": ["top15", "full43"],
+      "feature_modes": ["separate_metadata_text"],
+      "instructions": ["posttech_tight_c"],
+      "embedding_dims": [3072],
+      "max_lengths": [512],
+      "heads": ["calibrated_linearsvc"],
+      "repeats": [0, 1, 2],
+      "folds": [0, 1, 2, 3]
+    }
+  ]
+}

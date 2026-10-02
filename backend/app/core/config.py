@@ -18,3 +18,4 @@ RANDOM_SEED = 42
 def ensure_directories() -> None:
     for path in (RAW_DATA_DIR, PROCESSED_DIR, MODELS_DIR, EVALUATION_DIR, FIGURES_DIR):
         path.mkdir(parents=True, exist_ok=True)
+

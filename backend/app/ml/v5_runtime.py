@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping, Sequence
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -85,8 +87,36 @@ def _aligned_probabilities(model: Any, values: np.ndarray, labels: Sequence[str]
     return np.divide(result, sums, out=np.zeros_like(result), where=sums > 0)
 
 
+class DecisionSoftmaxClassifier:
+    """Expose LinearSVC-style decision scores through a predict_proba contract.
+
+    The customer-adapted Qwen head is selected with leakage-safe OOF validation
+    as a LinearSVC.  QwenV5CategoryPipeline expects a probability-like interface
+    for blending with prototype and kNN heads, so this wrapper applies one fixed
+    softmax temperature without changing class ordering.
+    """
+
+    def __init__(self, estimator: Any, temperature: float = 1.0) -> None:
+        self.estimator = estimator
+        self.temperature = float(temperature)
+
+    @property
+    def classes_(self) -> np.ndarray:
+        return np.asarray(self.estimator.classes_, dtype=object)
+
+    def predict_proba(self, values: Any) -> np.ndarray:
+        scores = np.asarray(self.estimator.decision_function(values), dtype=float)
+        if scores.ndim == 1:
+            scores = np.column_stack([-scores, scores])
+        return _softmax(scores, self.temperature)
+
+    def predict(self, values: Any) -> np.ndarray:
+        probabilities = self.predict_proba(values)
+        return self.classes_[probabilities.argmax(axis=1)]
+
+
 class QwenV5CategoryPipeline:
-    """Serializable V5 inference pipeline; the pinned Qwen encoder is loaded lazily on CUDA."""
+    """Serializable V5 inference pipeline with lazy loading of the pinned Qwen encoder."""
 
     def __init__(
         self,
@@ -108,6 +138,8 @@ class QwenV5CategoryPipeline:
         metadata_scale: float = 1.0,
         prototype_temperature: float = 0.08,
         batch_size: int = 8,
+        blend_weights: Sequence[float] = (0.90, 0.05, 0.05),
+        adapter_dir: str = "",
     ) -> None:
         self.labels = [str(value) for value in labels]
         self.model_id = model_id
@@ -126,6 +158,8 @@ class QwenV5CategoryPipeline:
         self.metadata_scale = float(metadata_scale)
         self.prototype_temperature = float(prototype_temperature)
         self.batch_size = int(batch_size)
+        self.blend_weights = tuple(float(value) for value in blend_weights)
+        self.adapter_dir = str(adapter_dir)
         self._sentence_model: Any | None = None
 
     @property
@@ -143,15 +177,36 @@ class QwenV5CategoryPipeline:
         import torch
         from sentence_transformers import SentenceTransformer
 
-        if not torch.cuda.is_available():
-            raise RuntimeError("V5 Qwen embedding runtime requires a CUDA GPU")
+        device = resolve_qwen_device(torch, os.getenv("QWEN_DEVICE", "auto"))
+        if device == "cuda" and not torch.cuda.is_available():
+            raise RuntimeError("V5 Qwen embedding runtime requires an available CUDA GPU")
+        if device == "mps" and not torch.backends.mps.is_available():
+            raise RuntimeError("V5 Qwen embedding runtime requires Apple MPS support")
+        local_model_dir = os.getenv("QWEN_LOCAL_MODEL_DIR", "").strip()
+        model_name_or_path = local_model_dir or self.model_id
+        revision = None if local_model_dir else self.model_revision
+        torch_dtype = torch.float16 if device in {"cuda", "mps"} else torch.float32
         self._sentence_model = SentenceTransformer(
-            self.model_id,
-            revision=self.model_revision,
+            model_name_or_path,
+            revision=revision,
             trust_remote_code=True,
-            device="cuda",
-            model_kwargs={"torch_dtype": torch.float16},
+            device=device,
+            model_kwargs={"torch_dtype": torch_dtype},
         )
+        adapter_dir = str(getattr(self, "adapter_dir", "") or "").strip()
+        if adapter_dir:
+            from peft import PeftModel
+
+            adapter_path = Path(adapter_dir)
+            if not adapter_path.is_absolute():
+                adapter_path = Path(__file__).resolve().parents[3] / adapter_path
+            if not adapter_path.exists():
+                raise RuntimeError(f"Qwen PEFT adapter is missing: {adapter_path}")
+            self._sentence_model[0].auto_model = PeftModel.from_pretrained(
+                self._sentence_model[0].auto_model,
+                str(adapter_path),
+                is_trainable=False,
+            )
         self._sentence_model.max_seq_length = self.max_length
         return self._sentence_model
 
@@ -201,6 +256,29 @@ class QwenV5CategoryPipeline:
             else:
                 rows.append({"description": str(value)})
         embeddings = self._embed(rows)
+        return self.predict_proba_from_embeddings(rows, embeddings)
+
+    def predict_proba_from_embeddings(
+        self,
+        values: Sequence[Any],
+        embeddings: np.ndarray,
+    ) -> np.ndarray:
+        """Run the trained V5 heads on externally produced Qwen embeddings.
+
+        The operator recheck path uses this to run the same frozen classifier
+        with a memory-efficient MLX encoder on Apple Silicon. The embedding
+        runtime changes, while the metadata branch, classifier heads and
+        specialist logic remain identical to the deployment artifact.
+        """
+        rows: list[dict[str, Any]] = []
+        for value in values:
+            if isinstance(value, Mapping):
+                rows.append(dict(value))
+            else:
+                rows.append({"description": str(value)})
+        embeddings = _normalize(np.asarray(embeddings, dtype=float)[:, : self.embedding_dim])
+        if len(embeddings) != len(rows):
+            raise ValueError("Embedding row count must match input row count")
         metadata = np.asarray(
             self.metadata_encoder.transform(build_v5_structured_features(rows)),
             dtype=float,
@@ -213,10 +291,24 @@ class QwenV5CategoryPipeline:
             temperature=float(getattr(self, "prototype_temperature", 0.08)),
         )
         knn = _aligned_probabilities(self.knn_model, embeddings, self.labels)
-        probabilities = 0.90 * supervised + 0.05 * prototype + 0.05 * knn
+        blend = tuple(getattr(self, "blend_weights", (0.90, 0.05, 0.05)))
+        if len(blend) != 3:
+            raise ValueError("Qwen blend_weights must contain supervised, prototype and kNN weights")
+        probabilities = blend[0] * supervised + blend[1] * prototype + blend[2] * knn
         probabilities /= probabilities.sum(axis=1, keepdims=True)
         return self._apply_specialist(rows, probabilities)
 
     def predict(self, values: Sequence[Any]) -> np.ndarray:
         probabilities = self.predict_proba(values)
         return self.classes_[probabilities.argmax(axis=1)]
+def resolve_qwen_device(torch_module: Any, requested: str) -> str:
+    requested = requested.strip().lower() or "auto"
+    if requested == "auto":
+        if torch_module.cuda.is_available():
+            return "cuda"
+        if torch_module.backends.mps.is_available():
+            return "mps"
+        return "cpu"
+    if requested not in {"cuda", "mps", "cpu"}:
+        raise ValueError("QWEN_DEVICE must be one of: auto, cuda, mps, cpu")
+    return requested

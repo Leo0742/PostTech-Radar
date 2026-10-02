@@ -1,0 +1,79 @@
+{
+  "schema_version": "5.1",
+  "server": "B",
+  "workspace": "/workspace/posttech-v5-challengers",
+  "artifact_root": "artifacts/gpu_research_v5/runs/server_b",
+  "funnel": ["smoke", "one_fold", "several_folds", "full_repeated"],
+  "models": [
+    {
+      "id": "BAAI/bge-multilingual-gemma2",
+      "revision": null,
+      "deployment_policy": "normal"
+    },
+    {
+      "id": "nvidia/llama-embed-nemotron-8b",
+      "revision": null,
+      "deployment_policy": "research_only_until_license_verified"
+    },
+    {
+      "id": "Qwen/Qwen3-Embedding-4B",
+      "revision": null,
+      "deployment_policy": "v5_reference"
+    }
+  ],
+  "stages": [
+    {
+      "name": "smoke",
+      "views": ["top15"],
+      "feature_modes": ["text_only"],
+      "instructions": ["none"],
+      "embedding_dims": [2048],
+      "max_lengths": [256],
+      "heads": ["logreg"],
+      "repeats": [0],
+      "folds": [0]
+    },
+    {
+      "name": "one_fold",
+      "inherit_top_n_from": "smoke",
+      "top_n": 3,
+      "inherit_fields": ["model_id", "model_revision", "deployment_policy"],
+      "views": ["top15"],
+      "feature_modes": ["text_only"],
+      "instructions": ["posttech_service_desk"],
+      "embedding_dims": [2048],
+      "max_lengths": [384],
+      "heads": ["logreg"],
+      "repeats": [0],
+      "folds": [0]
+    },
+    {
+      "name": "several_folds",
+      "inherit_top_n_from": "one_fold",
+      "top_n": 2,
+      "inherit_fields": ["model_id", "model_revision", "deployment_policy", "instruction", "embedding_dim", "max_length", "feature_mode", "head"],
+      "views": ["top15"],
+      "feature_modes": ["text_only"],
+      "instructions": ["posttech_service_desk"],
+      "embedding_dims": [2048],
+      "max_lengths": [384],
+      "heads": ["logreg"],
+      "repeats": [0],
+      "folds": [0, 1, 2, 3]
+    },
+    {
+      "name": "full_repeated",
+      "inherit_top_n_from": "several_folds",
+      "top_n": 1,
+      "inherit_fields": ["model_id", "model_revision", "deployment_policy", "instruction", "embedding_dim", "max_length", "feature_mode", "head"],
+      "views": ["top15", "full43"],
+      "feature_modes": ["text_only"],
+      "instructions": ["posttech_service_desk"],
+      "embedding_dims": [2048],
+      "max_lengths": [384],
+      "heads": ["logreg"],
+      "repeats": [0, 1, 2],
+      "folds": [0, 1, 2, 3]
+    }
+  ]
+}

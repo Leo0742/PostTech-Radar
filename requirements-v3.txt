@@ -1,0 +1,9 @@
+-r requirements.txt
+catboost==1.2.10
+pandas==2.3.3
+torch==2.10.0
+transformers==4.57.6
+sentence-transformers==5.1.2
+setfit==1.2.0
+rank-bm25==0.2.2
+psutil==7.1.3

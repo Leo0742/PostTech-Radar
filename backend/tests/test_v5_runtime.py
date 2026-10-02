@@ -2,7 +2,33 @@ from __future__ import annotations
 
 import joblib
 import numpy as np
-from app.ml.v5_runtime import QwenV5CategoryPipeline, build_v5_structured_features, specialist_text
+import pytest
+from app.ml.v5_runtime import (
+    QwenV5CategoryPipeline,
+    build_v5_structured_features,
+    resolve_qwen_device,
+    specialist_text,
+)
+
+
+class _Backends:
+    class mps:
+        @staticmethod
+        def is_available() -> bool:
+            return False
+
+
+class _TorchWithoutAccelerator:
+    backends = _Backends()
+
+    class cuda:
+        @staticmethod
+        def is_available() -> bool:
+            return False
+
+
+def test_qwen_auto_device_falls_back_to_cpu() -> None:
+    assert resolve_qwen_device(_TorchWithoutAccelerator, "auto") == "cpu"
 
 
 class _MetadataEncoder:
@@ -128,3 +154,30 @@ def test_v5_pipeline_joblib_roundtrip_preserves_lite_profile_parameters(tmp_path
     assert loaded.metadata_scale == 0.75
     assert loaded.prototype_temperature == 0.08
     assert loaded.model_id == "local/test"
+
+
+def test_qwen_runtime_can_use_local_snapshot_on_mps(tmp_path, monkeypatch) -> None:
+    sentence_transformers = pytest.importorskip("sentence_transformers")
+    torch = pytest.importorskip("torch")
+
+    local_model = tmp_path / "Qwen3-Embedding-4B"
+    local_model.mkdir()
+    calls: list[tuple[object, dict[str, object]]] = []
+
+    class _FakeSentenceTransformer:
+        def __init__(self, model_name_or_path, **kwargs) -> None:
+            calls.append((model_name_or_path, kwargs))
+
+    monkeypatch.setenv("QWEN_DEVICE", "mps")
+    monkeypatch.setenv("QWEN_LOCAL_MODEL_DIR", str(local_model))
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: True)
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", _FakeSentenceTransformer)
+
+    runtime = _pipeline(stub_embed=False)
+    model = runtime._load_sentence_model()
+
+    assert isinstance(model, _FakeSentenceTransformer)
+    assert calls[0][0] == str(local_model)
+    assert calls[0][1]["device"] == "mps"
+    assert calls[0][1]["revision"] is None
+    assert calls[0][1]["model_kwargs"] == {"torch_dtype": torch.float16}

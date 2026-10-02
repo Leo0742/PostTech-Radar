@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from functools import lru_cache
 from typing import Annotated, Any
 from urllib.parse import unquote
@@ -9,6 +10,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 
 from app.core.config import DATABASE_PATH, EVALUATION_DIR, FIGURES_DIR, MODELS_DIR
+from app.ml.qwen_recheck import QwenRecheckError, recheck_with_qwen
 from app.ml.runtime import analyze_ticket, load_runtime, route_ticket, similar_tickets
 from app.schemas import TicketAnalyzeRequest
 from app.schemas.incoming import (
@@ -80,6 +82,14 @@ def options() -> dict[str, list[str]]:
 @router.post("/tickets/analyze")
 def analyze(payload: TicketAnalyzeRequest) -> dict[str, Any]:
     return analyze_ticket(runtime(), payload.model_dump())
+
+
+@router.post("/tickets/recheck-qwen")
+def recheck_qwen(payload: TicketAnalyzeRequest) -> dict[str, Any]:
+    try:
+        return recheck_with_qwen(payload.model_dump())
+    except QwenRecheckError as error:
+        raise HTTPException(503, str(error)) from error
 
 
 @router.post("/tickets/similar")
@@ -246,8 +256,8 @@ def tickets(
     category: str | None = None,
     priority: str | None = None,
     support_line: str | None = None,
-    date_from: str | None = None,
-    date_to: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> dict[str, Any]:
     return list_tickets(
         page=page,
@@ -257,8 +267,8 @@ def tickets(
         category=category,
         priority=priority,
         support_line=support_line,
-        date_from=date_from,
-        date_to=date_to,
+        date_from=date_from.isoformat() if date_from else None,
+        date_to=date_to.isoformat() if date_to else None,
     )
 
 
@@ -298,15 +308,22 @@ def ticket_revisions(request_id: str) -> list[dict[str, Any]]:
 
 @router.get("/analytics/summary")
 def analytics(
-    date_from: str | None = None,
-    date_to: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     service: str | None = None,
     category: str | None = None,
     priority: str | None = None,
     support_line: str | None = None,
 ) -> dict[str, Any]:
     return analytics_summary(
-        AnalyticsFilters(date_from, date_to, service, category, priority, support_line)
+        AnalyticsFilters(
+            date_from.isoformat() if date_from else None,
+            date_to.isoformat() if date_to else None,
+            service,
+            category,
+            priority,
+            support_line,
+        )
     )
 
 

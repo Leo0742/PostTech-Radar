@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import math
 import os
@@ -17,23 +18,35 @@ from app.ml.v4.runtime import apply_final_policy
 from app.services.data_service import human_duration
 
 
+def _lite_v3_dependencies_available() -> bool:
+    return (
+        importlib.util.find_spec("sentence_transformers") is not None
+        and importlib.util.find_spec("torch") is not None
+    )
+
+
 def load_runtime(models_dir: Path = MODELS_DIR, model_profile: str | None = None) -> dict[str, Any]:
     fallback_category = joblib.load(models_dir / "category.joblib")
     category = fallback_category
     fallback_reason = ""
     profile_fallback_reason = ""
     category_source = "legacy"
-    requested_profile = (model_profile or os.getenv("MODEL_PROFILE", "quality")).strip().lower() or "quality"
+    requested_profile = (model_profile or os.getenv("MODEL_PROFILE", "lite")).strip().lower() or "lite"
     if requested_profile not in {"quality", "lite"}:
         raise ValueError("MODEL_PROFILE must be either 'quality' or 'lite'")
 
     v5_quality_path = models_dir / "v5" / "category.joblib"
-    v5_lite_path = models_dir / "v5" / "category_qwen4b_lite.joblib"
-    v5_candidates = (
-        [(v5_lite_path, "lite"), (v5_quality_path, "quality")]
-        if requested_profile == "lite"
-        else [(v5_quality_path, "quality")]
+    v5_lite_v3_path = Path(
+        os.getenv("LITE_CATEGORY_ARTIFACT", str(models_dir / "v5" / "category_lite_v3.joblib"))
     )
+    v5_lite_v2_path = models_dir / "v5" / "category_lite_v2.joblib"
+    if requested_profile == "lite":
+        v5_candidates = []
+        if _lite_v3_dependencies_available():
+            v5_candidates.append((v5_lite_v3_path, "lite"))
+        v5_candidates.append((v5_lite_v2_path, "lite"))
+    else:
+        v5_candidates = [(v5_quality_path, "quality")]
     v4_category_path = models_dir / "v4" / "category.joblib"
     active_profile = "legacy"
     category_artifact = models_dir / "category.joblib"
@@ -48,7 +61,7 @@ def load_runtime(models_dir: Path = MODELS_DIR, model_profile: str | None = None
             active_profile = candidate_profile
             category_artifact = v5_category_path
             break
-        except Exception as error:
+        except Exception as error:  # pragma: no cover - exercised by deployment smoke test
             if candidate_profile == requested_profile:
                 profile_fallback_reason = f"{candidate_profile} V5 artifact unavailable: {type(error).__name__}"
             else:
@@ -59,7 +72,7 @@ def load_runtime(models_dir: Path = MODELS_DIR, model_profile: str | None = None
             category_source = "v4"
             active_profile = "v4"
             category_artifact = v4_category_path
-        except Exception as error:
+        except Exception as error:  # pragma: no cover - exercised by deployment smoke test
             suffix = f"; v4 category unavailable: {type(error).__name__}"
             fallback_reason = f"{fallback_reason}{suffix}".lstrip("; ")
     routing = joblib.load(models_dir / "routing.joblib")
@@ -71,7 +84,7 @@ def load_runtime(models_dir: Path = MODELS_DIR, model_profile: str | None = None
         "model_profile_requested": requested_profile,
         "model_profile_active": active_profile,
         "category_artifact": str(category_artifact),
-        "metadata": {"top15": category["top15"], "threshold": category["threshold"],
+        "metadata": {"top15": category.get("top15", []), "threshold": category["threshold"],
                      "routing_threshold": routing.get("threshold")},
     }
     policy_path = models_dir / "v4_runtime.json"
@@ -187,6 +200,7 @@ def retrieve_similar_tickets(runtime: dict[str, Any], payload: dict[str, Any], l
 
 
 def similar_tickets(runtime: dict[str, Any], payload: dict[str, Any], limit: int = 6) -> list[dict[str, Any]]:
+    """Backward-compatible list-only retrieval contract."""
     return retrieve_similar_tickets(runtime, payload, limit)["items"]
 
 
@@ -294,6 +308,13 @@ def route_ticket(
     confirmed_category: str | None = None,
     database: Path = DATABASE_PATH,
 ) -> dict[str, Any]:
+    """Route from registration-time inputs, optionally conditioned on category evidence.
+
+    Before operator confirmation, category TOP-K probabilities are used as a historical
+    prior. After confirmation/correction, the confirmed category replaces that prior.
+    Production feedback rows are deliberately excluded from this prior until a controlled
+    retraining/promotion cycle incorporates them.
+    """
     row = _request_row(payload)
     text = registration_text(row)
     routing_bundle = runtime["routing"]
@@ -324,6 +345,14 @@ def route_ticket(
     best = alternatives[0]
     threshold = float(routing_bundle.get("threshold", 0.55))
     accepted = best["confidence"] >= threshold
+    leading_category = category_weights[0][0] if category_weights else ""
+    if prior is not None and leading_category:
+        explanation = (
+            f"По истории обращений категория «{leading_category}» чаще всего "
+            "направлялась на эту линию."
+        )
+    else:
+        explanation = "Линия выбрана по регистрационным признакам обращения."
     return {
         "label": best["label"],
         "confidence": best["confidence"],
@@ -333,11 +362,7 @@ def route_ticket(
         "review_reason": "" if accepted else _review_reason(alternatives, threshold),
         "alternatives": alternatives,
         "signals": _explain(routing_bundle.get("explanation_pipeline"), text, best["label"], 4),
-        "explanation": (
-            "Маршрут рассчитан по регистрационным полям и подтверждённой категории."
-            if confirmed_category
-            else "Маршрут рассчитан по регистрационным полям и TOP-K категорий модели."
-        ) + " 4-я линия требует ручной оценки из-за одного исторического примера.",
+        "explanation": explanation,
         "mode": mode,
         "category_prior_used": prior is not None,
     }

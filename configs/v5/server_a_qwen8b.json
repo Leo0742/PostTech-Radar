@@ -1,0 +1,90 @@
+{
+  "schema_version": "5.1",
+  "server": "A",
+  "workspace": "/workspace/posttech-v5-qwen8b",
+  "artifact_root": "artifacts/gpu_research_v5/runs/server_a",
+  "model": {
+    "id": "Qwen/Qwen3-Embedding-8B",
+    "revision": null,
+    "deployment_policy": "normal"
+  },
+  "stages": [
+    {
+      "name": "smoke",
+      "views": ["top15"],
+      "feature_modes": ["text_only"],
+      "instructions": ["none"],
+      "embedding_dims": [2048],
+      "max_lengths": [256],
+      "heads": ["logreg"],
+      "repeats": [0],
+      "folds": [0]
+    },
+    {
+      "name": "instruction_search",
+      "inherit_best_from": "smoke",
+      "inherit_fields": ["model_id", "model_revision", "deployment_policy"],
+      "views": ["top15"],
+      "feature_modes": ["text_only"],
+      "instructions": ["none", "ru_concise", "en_concise", "bilingual", "taxonomy_aware", "posttech_service_desk"],
+      "embedding_dims": [2048],
+      "max_lengths": [256],
+      "heads": ["logreg"],
+      "repeats": [0],
+      "folds": [0]
+    },
+    {
+      "name": "representation_search",
+      "inherit_best_from": "instruction_search",
+      "inherit_fields": ["model_id", "model_revision", "deployment_policy", "instruction"],
+      "views": ["top15"],
+      "feature_modes": ["text_only"],
+      "instructions": ["none"],
+      "embedding_dims": [4096, 3072, 2048, 1024],
+      "max_lengths": [128, 256, 384, 512, 768, 1024],
+      "heads": ["logreg"],
+      "repeats": [0],
+      "folds": [0]
+    },
+    {
+      "name": "feature_search",
+      "inherit_best_from": "representation_search",
+      "inherit_fields": ["model_id", "model_revision", "deployment_policy", "instruction", "embedding_dim", "max_length"],
+      "views": ["top15"],
+      "feature_modes": ["text_only", "metadata_prefix_text", "separate_metadata_text", "metadata_prior_text", "metadata_only_fallback", "text_only_fallback"],
+      "instructions": ["none"],
+      "embedding_dims": [2048],
+      "max_lengths": [256],
+      "heads": ["logreg"],
+      "repeats": [0],
+      "folds": [0, 1]
+    },
+    {
+      "name": "head_tournament",
+      "inherit_best_from": "feature_search",
+      "inherit_fields": ["model_id", "model_revision", "deployment_policy", "instruction", "embedding_dim", "max_length", "feature_mode"],
+      "views": ["top15"],
+      "feature_modes": ["text_only"],
+      "instructions": ["none"],
+      "embedding_dims": [2048],
+      "max_lengths": [256],
+      "heads": ["logreg", "calibrated_logreg", "calibrated_linearsvc", "shallow_mlp", "centroid", "knn", "label_similarity", "metadata_fusion"],
+      "repeats": [0],
+      "folds": [0, 1, 2, 3]
+    },
+    {
+      "name": "repeated_eval",
+      "inherit_top_n_from": "head_tournament",
+      "top_n": 3,
+      "inherit_fields": ["model_id", "model_revision", "deployment_policy", "instruction", "embedding_dim", "max_length", "feature_mode", "head"],
+      "views": ["top15", "full43"],
+      "feature_modes": ["text_only"],
+      "instructions": ["none"],
+      "embedding_dims": [2048],
+      "max_lengths": [256],
+      "heads": ["logreg"],
+      "repeats": [0, 1, 2],
+      "folds": [0, 1, 2, 3]
+    }
+  ]
+}

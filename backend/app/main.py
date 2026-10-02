@@ -37,3 +37,4 @@ def frontend(full_path: str) -> FileResponse:
     if candidate.is_file() and frontend_dist.resolve() in candidate.parents:
         return FileResponse(candidate)
     return FileResponse(index)
+

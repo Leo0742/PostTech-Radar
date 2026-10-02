@@ -1,0 +1,24 @@
+{
+  "schema_version": "5.1",
+  "server": "B-quality-sprint",
+  "workspace": "/workspace/posttech-v5-qwen8b",
+  "artifact_root": "artifacts/gpu_research_v5/runs/qwen8b_oof_stack_smoke",
+  "model": {
+    "id": "Qwen/Qwen3-Embedding-8B",
+    "revision": "1d8ad4ca9b3dd8059ad90a75d4983776a23d44af",
+    "deployment_policy": "normal"
+  },
+  "stages": [
+    {
+      "name": "oof_stack_smoke",
+      "views": ["top15"],
+      "feature_modes": ["separate_metadata_text"],
+      "instructions": ["en_concise"],
+      "embedding_dims": [3072],
+      "max_lengths": [512],
+      "heads": ["oof_stack_logreg"],
+      "repeats": [0],
+      "folds": [0]
+    }
+  ]
+}

@@ -28,7 +28,7 @@ from app.ml.v5_runtime import QwenV5CategoryPipeline, specialist_text  # noqa: E
 from scripts.v5_dataset import DEFAULT_DATASET, load_v5_rows  # noqa: E402
 from scripts.v5_experiment import (  # noqa: E402
     DEFAULT_CONTRACT,
-    INSTRUCTION_REGISTRY,
+    EXTENDED_INSTRUCTION_REGISTRY,
     build_text,
     labels_for_view,
     load_json,
@@ -213,7 +213,7 @@ def main() -> None:
         labels=labels,
         model_id=MODEL_ID,
         model_revision=MODEL_REVISION,
-        instruction=INSTRUCTION_REGISTRY[INSTRUCTION_KEY],
+        instruction=EXTENDED_INSTRUCTION_REGISTRY[INSTRUCTION_KEY],
         max_length=MAX_LENGTH,
         embedding_dim=EMBEDDING_DIM,
         metadata_encoder=metadata_encoder,

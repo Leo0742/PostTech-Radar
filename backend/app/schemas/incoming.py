@@ -18,7 +18,7 @@ class IncomingManualRequest(BaseModel):
     timezone: str = ""
 
     @model_validator(mode="after")
-    def require_analyzable_input(self) -> "IncomingManualRequest":
+    def require_analyzable_input(self) -> IncomingManualRequest:
         if not any(
             str(getattr(self, field)).strip()
             for field in (

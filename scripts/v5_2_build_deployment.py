@@ -18,18 +18,18 @@ from sklearn.pipeline import FeatureUnion
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.svm import LinearSVC
 
-
 ROOT = Path(__file__).resolve().parents[1]
 for path in (ROOT, ROOT / "backend"):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
 from app.ml.v5_runtime import QwenV5CategoryPipeline, specialist_text  # noqa: E402
+
 from scripts.v5_2_synthetic import _load_synthetic, _select_synthetic  # noqa: E402
 from scripts.v5_dataset import DEFAULT_DATASET, load_v5_rows  # noqa: E402
 from scripts.v5_experiment import (  # noqa: E402
     DEFAULT_CONTRACT,
-    INSTRUCTION_REGISTRY,
+    EXTENDED_INSTRUCTION_REGISTRY,
     build_text,
     labels_for_view,
     load_json,
@@ -42,7 +42,6 @@ from scripts.v5_gpu_runner import (  # noqa: E402
     _normalize_rows,
     build_structured_features,
 )
-
 
 MODEL_ID = "Qwen/Qwen3-Embedding-8B"
 MODEL_REVISION = "1d8ad4ca9b3dd8059ad90a75d4983776a23d44af"
@@ -187,7 +186,7 @@ def main() -> None:
         labels=labels,
         model_id=MODEL_ID,
         model_revision=MODEL_REVISION,
-        instruction=INSTRUCTION_REGISTRY[INSTRUCTION_KEY],
+        instruction=EXTENDED_INSTRUCTION_REGISTRY[INSTRUCTION_KEY],
         max_length=MAX_LENGTH,
         embedding_dim=EMBEDDING_DIM,
         metadata_encoder=metadata_encoder,
